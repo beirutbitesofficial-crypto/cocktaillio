@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Cocktailliio POS",
-  description: "Cocktailliio POS — resto café, lounge, hookah and cocktails.",
-  icons: { icon: "/favicon.svg" },
+  title: "Cocktaillo POS",
+  description: "Cocktaillo POS — Resto Café.",
+  icons: { icon: "/cocktaillo-logo.png" },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#176b46",
+  themeColor: "#123f2b",
 };
 
 export default function RootLayout({
