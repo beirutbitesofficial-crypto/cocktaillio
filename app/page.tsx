@@ -2847,4 +2847,7 @@ function ReceiptContent({ receipt, money, tr }: {
         <strong>{tr("Scan to follow us on Instagram", "امسح الرمز وتابعنا على إنستغرام")}</strong>
         <span>@cocktailliio</span>
       </a>
-      <p className="thermal-footer"><strong>{tr("Thank you!", "شكراً!")}</strong><span>Cocktailliio • Resto café, lounge, hookah and cocktails</span><small>JMR Mall • Mazboud, C
+      <p className="thermal-footer"><strong>{tr("Thank you!", "شكراً!")}</strong><span>Cocktailliio • Resto café, lounge, hookah and cocktails</span><small>JMR Mall • Mazboud, Chouf</small></p>
+    </article>
+  );
+}
