@@ -313,7 +313,2426 @@ function toppingLimit(item: MenuItem, topping: Topping) {
 
 function makeInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (!parts.le…38145 tokens truncated…       {accounts.map((user) => (
+  if (!parts.length) return "U";
+  return `${parts[0][0] ?? ""}${parts.length > 1 ? parts[parts.length - 1][0] ?? "" : ""}`.toUpperCase();
+}
+
+function isUserAccount(value: unknown): value is UserAccount {
+  if (!value || typeof value !== "object") return false;
+  const account = value as Record<string, unknown>;
+  return typeof account.id === "string"
+    && typeof account.username === "string"
+    && typeof account.password === "string"
+    && typeof account.name === "string"
+    && typeof account.initials === "string"
+    && (account.role === "manager" || account.role === "cashier")
+    && typeof account.active === "boolean";
+}
+
+function parseStoredUsers(value: string | null) {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed) || !parsed.length || !parsed.every(isUserAccount)) return null;
+    const normalizedUsernames = parsed.map((account) => account.username.trim().toLowerCase());
+    const hasUniqueUsernames = new Set(normalizedUsernames).size === normalizedUsernames.length;
+    const hasActiveManager = parsed.some((account) => account.role === "manager" && account.active);
+    return hasUniqueUsernames && hasActiveManager ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function isMenuItem(value: unknown): value is MenuItem {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Record<string, unknown>;
+  return typeof item.id === "string"
+    && item.id.trim().length > 0
+    && typeof item.name === "string"
+    && item.name.trim().length >= 2
+    && typeof item.description === "string"
+    && typeof item.price === "number"
+    && Number.isFinite(item.price)
+    && item.price >= 0
+    && typeof item.image === "string"
+    && (item.category === "Food" || item.category === "Hookah" || item.category === "Cocktail" || item.category === "Hot Drink" || item.category === "Cold Drink" || item.category === "Dessert" || item.category === "Other")
+    && typeof item.available === "boolean"
+    && typeof item.customizable === "boolean";
+}
+
+function isTopping(value: unknown): value is Topping {
+  if (!value || typeof value !== "object") return false;
+  const topping = value as Record<string, unknown>;
+  return typeof topping.id === "string"
+    && topping.id.trim().length > 0
+    && typeof topping.name === "string"
+    && topping.name.trim().length >= 2
+    && typeof topping.price === "number"
+    && Number.isFinite(topping.price)
+    && topping.price >= 0
+    && typeof topping.emoji === "string"
+    && typeof topping.available === "boolean";
+}
+
+function isExpense(value: unknown): value is Expense {
+  if (!value || typeof value !== "object") return false;
+  const expense = value as Record<string, unknown>;
+  return typeof expense.id === "string"
+    && expense.id.trim().length > 0
+    && typeof expense.item === "string"
+    && expense.item.trim().length >= 2
+    && (expense.category === "Electricity" || expense.category === "Salary" || expense.category === "Internet" || expense.category === "Rent" || expense.category === "Supplies" || expense.category === "Other")
+    && typeof expense.amount === "number"
+    && Number.isFinite(expense.amount)
+    && expense.amount >= 0
+    && typeof expense.date === "string"
+    && /^\d{4}-\d{2}-\d{2}$/.test(expense.date)
+    && typeof expense.addedBy === "string";
+}
+
+function isInventoryItem(value: unknown): value is InventoryItem {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Record<string, unknown>;
+  return typeof item.id === "string"
+    && item.id.trim().length > 0
+    && typeof item.item === "string"
+    && item.item.trim().length >= 2
+    && typeof item.category === "string"
+    && item.category.trim().length >= 2
+    && typeof item.stock === "number"
+    && Number.isFinite(item.stock)
+    && item.stock >= 0
+    && (item.unit === "g" || item.unit === "kg" || item.unit === "ml" || item.unit === "L" || item.unit === "item" || item.unit === "box")
+    && typeof item.min === "number"
+    && Number.isFinite(item.min)
+    && item.min >= 0
+    && typeof item.cost === "number"
+    && Number.isFinite(item.cost)
+    && item.cost >= 0;
+}
+
+function isRecentOrder(value: unknown): value is RecentOrder {
+  if (!value || typeof value !== "object") return false;
+  const order = value as Record<string, unknown>;
+  return typeof order.number === "string"
+    && typeof order.type === "string"
+    && typeof order.cashier === "string"
+    && typeof order.time === "string"
+    && (order.status === "Preparing" || order.status === "Ready" || order.status === "Paid")
+    && typeof order.total === "number"
+    && Number.isFinite(order.total)
+    && order.total >= 0;
+}
+
+function isRestaurantTable(value: unknown): value is RestaurantTable {
+  if (!value || typeof value !== "object") return false;
+  const table = value as Record<string, unknown>;
+  return typeof table.number === "number"
+    && Number.isInteger(table.number)
+    && table.number > 0
+    && typeof table.seats === "number"
+    && Number.isInteger(table.seats)
+    && table.seats > 0
+    && (table.status === "available" || table.status === "occupied" || table.status === "reserved")
+    && (table.order === undefined || typeof table.order === "string")
+    && (table.total === undefined || (typeof table.total === "number" && Number.isFinite(table.total) && table.total >= 0));
+}
+
+function isKitchenOrder(value: unknown): value is KitchenOrder {
+  if (!value || typeof value !== "object") return false;
+  const order = value as Record<string, unknown>;
+  return typeof order.id === "number"
+    && Number.isInteger(order.id)
+    && typeof order.number === "string"
+    && (order.type === "Dine-in" || order.type === "Takeaway" || order.type === "Delivery")
+    && Array.isArray(order.items)
+    && order.items.every((item) => typeof item === "string")
+    && (order.status === "pending" || order.status === "done")
+    && typeof order.time === "string"
+    && (order.customer === undefined || typeof order.customer === "string");
+}
+
+function parseOperationalCollection<T>(value: string | null, validator: (entry: unknown) => entry is T): T[] | null {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) && parsed.every(validator) ? parsed as T[] : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseSalesSnapshot(value: string | null): SalesSnapshot | null {
+  if (!value) return null;
+  try {
+    const snapshot = JSON.parse(value) as Partial<SalesSnapshot>;
+    return typeof snapshot.salesTotal === "number"
+      && Number.isFinite(snapshot.salesTotal)
+      && snapshot.salesTotal >= 0
+      && typeof snapshot.orders === "number"
+      && Number.isInteger(snapshot.orders)
+      && snapshot.orders >= 0
+      && typeof snapshot.nextOrderNumber === "number"
+      && Number.isInteger(snapshot.nextOrderNumber)
+      && snapshot.nextOrderNumber >= 1
+      && Array.isArray(snapshot.recentOrders)
+      && snapshot.recentOrders.every(isRecentOrder)
+      ? snapshot as SalesSnapshot
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function parsePrinterSettings(value: string | null): PrinterSettings {
+  if (!value) return defaultPrinterSettings;
+  try {
+    const saved = JSON.parse(value) as Partial<PrinterSettings>;
+    return {
+      serviceUrl: typeof saved.serviceUrl === "string" && saved.serviceUrl.startsWith("http://127.0.0.1:") ? saved.serviceUrl.replace(/\/$/, "") : defaultPrinterSettings.serviceUrl,
+      token: typeof saved.token === "string" ? saved.token : "",
+      autoPrint: typeof saved.autoPrint === "boolean" ? saved.autoPrint : true,
+      autoOpenDrawer: typeof saved.autoOpenDrawer === "boolean" ? saved.autoOpenDrawer : true,
+      printerName: typeof saved.printerName === "string" ? saved.printerName : "",
+      paperWidth: saved.paperWidth === 58 ? 58 : 80,
+      copies: typeof saved.copies === "number" ? Math.max(1, Math.min(5, Math.round(saved.copies))) : 1,
+      drawerPin: saved.drawerPin === 1 ? 1 : 0,
+      openDrawerAllPayments: saved.openDrawerAllPayments === true,
+    };
+  } catch { return defaultPrinterSettings; }
+}
+
+function parseStoredCollection<T>(value: string | null, validator: (entry: unknown) => entry is T): T[] | null {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed) || !parsed.every(validator)) return null;
+    const collection = parsed as T[];
+    const ids = collection.map((entry) => (entry as { id: string }).id);
+    return new Set(ids).size === ids.length ? collection : null;
+  } catch {
+    return null;
+  }
+}
+
+export default function Home() {
+  const [accounts, setAccounts] = useState<UserAccount[]>(initialUserAccounts);
+  const [accountsReady, setAccountsReady] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [loginForm, setLoginForm] = useState({ username: "", password: "" });
+  const [loginError, setLoginError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [userEditor, setUserEditor] = useState<UserEditor>(null);
+  const [userForm, setUserForm] = useState<UserFormState>(emptyUserForm);
+  const [userFormError, setUserFormError] = useState("");
+  const [showUserPassword, setShowUserPassword] = useState(false);
+  const [userMenuId, setUserMenuId] = useState<string | null>(null);
+  const [userConfirmation, setUserConfirmation] = useState<UserConfirmation>(null);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(initialMenuItems);
+  const [toppings, setToppings] = useState<Topping[]>(initialToppings);
+  const [menuDataReady, setMenuDataReady] = useState(false);
+  const [menuTab, setMenuTab] = useState<"items" | "toppings">("items");
+  const [posMenuFilter, setPosMenuFilter] = useState<"All" | MenuCategory>("All");
+  const [menuEditor, setMenuEditor] = useState<MenuEditor>(null);
+  const [menuItemForm, setMenuItemForm] = useState<MenuItemFormState>(emptyMenuItemForm);
+  const [toppingForm, setToppingForm] = useState<ToppingFormState>(emptyToppingForm);
+  const [menuFormError, setMenuFormError] = useState("");
+  const [menuDeleteConfirmation, setMenuDeleteConfirmation] = useState<MenuDeleteConfirmation>(null);
+  const [view, setView] = useState<View>("dashboard");
+  const [dark, setDark] = useState(false);
+  const [currency, setCurrency] = useState<Currency>("USD");
+  const [language, setLanguage] = useState<Language>("en");
+  const [exchangeRate, setExchangeRate] = useState(89500);
+  const [shiftOpen, setShiftOpen] = useState(false);
+  const [openingCash, setOpeningCash] = useState<number | null>(null);
+  const [openingCashInput, setOpeningCashInput] = useState("");
+  const [shiftStartedAt, setShiftStartedAt] = useState("");
+  const [shiftOpenedBy, setShiftOpenedBy] = useState("");
+  const [tables, setTables] = useState(initialTables);
+  const [tablesReady, setTablesReady] = useState(false);
+  const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
+  const [inventoryReady, setInventoryReady] = useState(false);
+  const [inventoryEditor, setInventoryEditor] = useState<InventoryEditor>(null);
+  const [inventoryForm, setInventoryForm] = useState<InventoryFormState>(emptyInventoryForm);
+  const [inventoryFormError, setInventoryFormError] = useState("");
+  const [inventoryDeleteConfirmation, setInventoryDeleteConfirmation] = useState<InventoryItem | null>(null);
+  const [restockTarget, setRestockTarget] = useState<InventoryItem | null>(null);
+  const [restockAmount, setRestockAmount] = useState("");
+  const [restockError, setRestockError] = useState("");
+  const [period, setPeriod] = useState("Daily");
+  const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
+  const [toppingStep, setToppingStep] = useState(0);
+  const [selectedToppingIds, setSelectedToppingIds] = useState<string[]>([]);
+  const [orderToppings, setOrderToppings] = useState<Topping[]>([]);
+  const [counterOrderType, setCounterOrderType] = useState<CounterOrderType | null>(null);
+  const [counterTable, setCounterTable] = useState<number | null>(null);
+  const [orderContact, setOrderContact] = useState({ name: "", phone: "", address: "", driver: "" });
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash");
+  const [cashReceivedInput, setCashReceivedInput] = useState("");
+  const [receiptPreviewOpen, setReceiptPreviewOpen] = useState(false);
+  const [nextOrderNumber, setNextOrderNumber] = useState(1043);
+  const [orders, setOrders] = useState(42);
+  const [salesTotal, setSalesTotal] = useState(1284.5);
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>(initialRecentOrders);
+  const [salesReady, setSalesReady] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [factoryResetOpen, setFactoryResetOpen] = useState(false);
+  const [kitchenOrders, setKitchenOrders] = useState<KitchenOrder[]>(initialKitchenOrders);
+  const [kitchenReady, setKitchenReady] = useState(false);
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [printerSettings, setPrinterSettings] = useState<PrinterSettings>(defaultPrinterSettings);
+  const [printerSettingsReady, setPrinterSettingsReady] = useState(false);
+  const [windowsPrinters, setWindowsPrinters] = useState<string[]>([]);
+  const [printerStatus, setPrinterStatus] = useState<"unknown" | "connected" | "error">("unknown");
+  const [printerError, setPrinterError] = useState("");
+  const [printBusy, setPrintBusy] = useState(false);
+  const [lastFailedPrint, setLastFailedPrint] = useState<FailedPrint | null>(null);
+  const completionLock = useRef(false);
+  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
+  const [expensesReady, setExpensesReady] = useState(false);
+  const [expenseEditor, setExpenseEditor] = useState<ExpenseEditor>(null);
+  const [expenseForm, setExpenseForm] = useState<ExpenseFormState>(emptyExpenseForm);
+  const [expenseFormError, setExpenseFormError] = useState("");
+  const [expenseDeleteConfirmation, setExpenseDeleteConfirmation] = useState<Expense | null>(null);
+  const currentUser = accounts.find((account) => account.id === currentUserId) ?? null;
+  const role: Role = currentUser?.role ?? "cashier";
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("cocktailliio-theme");
+    if (savedTheme === "dark") setDark(true);
+    const savedCurrency = localStorage.getItem("cocktailliio-currency") as Currency | null;
+    const savedLanguage = localStorage.getItem("cocktailliio-language") as Language | null;
+    if (savedCurrency) setCurrency(savedCurrency);
+    if (savedLanguage) setLanguage(savedLanguage);
+  }, []);
+
+  useEffect(() => {
+    setPrinterSettings(parsePrinterSettings(localStorage.getItem(printerStorageKey)));
+    setPrinterSettingsReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!printerSettingsReady) return;
+    localStorage.setItem(printerStorageKey, JSON.stringify(printerSettings));
+  }, [printerSettings, printerSettingsReady]);
+
+  useEffect(() => {
+    const savedAccounts = parseStoredUsers(localStorage.getItem(userStorageKey));
+    if (savedAccounts) setAccounts(savedAccounts);
+    setAccountsReady(true);
+
+    function syncAccounts(event: StorageEvent) {
+      if (event.key !== userStorageKey) return;
+      const nextAccounts = parseStoredUsers(event.newValue);
+      if (nextAccounts) setAccounts(nextAccounts);
+    }
+
+    window.addEventListener("storage", syncAccounts);
+    return () => window.removeEventListener("storage", syncAccounts);
+  }, []);
+
+  useEffect(() => {
+    if (!accountsReady) return;
+    localStorage.setItem(userStorageKey, JSON.stringify(accounts));
+  }, [accounts, accountsReady]);
+
+  useEffect(() => {
+    const savedMenuItems = parseStoredCollection(localStorage.getItem(menuStorageKey), isMenuItem);
+    const savedToppings = parseStoredCollection(localStorage.getItem(toppingStorageKey), isTopping);
+    if (savedMenuItems) setMenuItems(savedMenuItems);
+    if (savedToppings) setToppings(savedToppings);
+    setMenuDataReady(true);
+
+    function syncMenu(event: StorageEvent) {
+      if (event.key === menuStorageKey) {
+        const nextItems = parseStoredCollection(event.newValue, isMenuItem);
+        if (nextItems) setMenuItems(nextItems);
+      }
+      if (event.key === toppingStorageKey) {
+        const nextToppings = parseStoredCollection(event.newValue, isTopping);
+        if (nextToppings) setToppings(nextToppings);
+      }
+    }
+
+    window.addEventListener("storage", syncMenu);
+    return () => window.removeEventListener("storage", syncMenu);
+  }, []);
+
+  useEffect(() => {
+    if (!menuDataReady) return;
+    localStorage.setItem(menuStorageKey, JSON.stringify(menuItems));
+    localStorage.setItem(toppingStorageKey, JSON.stringify(toppings));
+  }, [menuDataReady, menuItems, toppings]);
+
+  useEffect(() => {
+    const savedExpenses = parseStoredCollection(localStorage.getItem(expenseStorageKey), isExpense);
+    if (savedExpenses) setExpenses(savedExpenses);
+    setExpensesReady(true);
+
+    function syncExpenses(event: StorageEvent) {
+      if (event.key !== expenseStorageKey) return;
+      const nextExpenses = parseStoredCollection(event.newValue, isExpense);
+      if (nextExpenses) setExpenses(nextExpenses);
+    }
+
+    window.addEventListener("storage", syncExpenses);
+    return () => window.removeEventListener("storage", syncExpenses);
+  }, []);
+
+  useEffect(() => {
+    if (!expensesReady) return;
+    localStorage.setItem(expenseStorageKey, JSON.stringify(expenses));
+  }, [expenses, expensesReady]);
+
+  useEffect(() => {
+    const savedInventory = parseStoredCollection(localStorage.getItem(inventoryStorageKey), isInventoryItem);
+    if (savedInventory) setInventory(savedInventory);
+    setInventoryReady(true);
+
+    function syncInventory(event: StorageEvent) {
+      if (event.key !== inventoryStorageKey) return;
+      const nextInventory = parseStoredCollection(event.newValue, isInventoryItem);
+      if (nextInventory) setInventory(nextInventory);
+    }
+
+    window.addEventListener("storage", syncInventory);
+    return () => window.removeEventListener("storage", syncInventory);
+  }, []);
+
+  useEffect(() => {
+    if (!inventoryReady) return;
+    localStorage.setItem(inventoryStorageKey, JSON.stringify(inventory));
+  }, [inventory, inventoryReady]);
+
+  useEffect(() => {
+    const savedTables = parseOperationalCollection(localStorage.getItem(tablesStorageKey), isRestaurantTable);
+    const legacyReset = localStorage.getItem(expenseStorageKey) === "[]" && localStorage.getItem(inventoryStorageKey) === "[]";
+    const cleanTables = initialTables.map(({ number, seats }) => ({ number, seats, status: "available" as const }));
+    setTables(savedTables ?? (legacyReset ? cleanTables : initialTables));
+    setTablesReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!tablesReady) return;
+    localStorage.setItem(tablesStorageKey, JSON.stringify(tables));
+  }, [tables, tablesReady]);
+
+  useEffect(() => {
+    const savedKitchenOrders = parseOperationalCollection(localStorage.getItem(kitchenStorageKey), isKitchenOrder);
+    const legacyReset = localStorage.getItem(expenseStorageKey) === "[]" && localStorage.getItem(inventoryStorageKey) === "[]";
+    setKitchenOrders(savedKitchenOrders ?? (legacyReset ? [] : initialKitchenOrders));
+    setKitchenReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!kitchenReady) return;
+    localStorage.setItem(kitchenStorageKey, JSON.stringify(kitchenOrders));
+  }, [kitchenOrders, kitchenReady]);
+
+  useEffect(() => {
+    const savedSales = parseSalesSnapshot(localStorage.getItem(salesStorageKey));
+    const legacyReset = localStorage.getItem(expenseStorageKey) === "[]"
+      && localStorage.getItem(inventoryStorageKey) === "[]"
+      && savedSales?.salesTotal === 1284.5
+      && savedSales.orders === 42;
+    if (legacyReset) {
+      setSalesTotal(0);
+      setOrders(0);
+      setNextOrderNumber(1);
+      setRecentOrders([]);
+    } else if (savedSales) {
+      setSalesTotal(savedSales.salesTotal);
+      setOrders(savedSales.orders);
+      setNextOrderNumber(savedSales.nextOrderNumber);
+      setRecentOrders(savedSales.recentOrders);
+    }
+    setSalesReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!salesReady) return;
+    const snapshot: SalesSnapshot = { salesTotal, orders, nextOrderNumber, recentOrders };
+    localStorage.setItem(salesStorageKey, JSON.stringify(snapshot));
+  }, [nextOrderNumber, orders, recentOrders, salesReady, salesTotal]);
+
+  useEffect(() => {
+    if (!accountsReady || !currentUserId) return;
+    const activeAccount = accounts.find((account) => account.id === currentUserId);
+    if (activeAccount?.active) return;
+    setCurrentUserId(null);
+    setShiftOpen(false);
+    setOpeningCash(null);
+    setOpeningCashInput("");
+    setShiftStartedAt("");
+    setShiftOpenedBy("");
+    setView("dashboard");
+    setNotice(language === "ar" ? "لم يعد حسابك مفعّلاً." : "Your account is no longer active.");
+    window.setTimeout(() => setNotice(""), 2600);
+  }, [accounts, accountsReady, currentUserId, language]);
+
+  useEffect(() => {
+    function closeUserLayer(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      if (factoryResetOpen) setFactoryResetOpen(false);
+      else if (restockTarget) {
+        setRestockTarget(null);
+        setRestockAmount("");
+        setRestockError("");
+      }
+      else if (inventoryDeleteConfirmation) setInventoryDeleteConfirmation(null);
+      else if (inventoryEditor) {
+        setInventoryEditor(null);
+        setInventoryFormError("");
+      }
+      else if (expenseDeleteConfirmation) setExpenseDeleteConfirmation(null);
+      else if (expenseEditor) {
+        setExpenseEditor(null);
+        setExpenseFormError("");
+      }
+      else if (menuDeleteConfirmation) setMenuDeleteConfirmation(null);
+      else if (userConfirmation) setUserConfirmation(null);
+      else if (userEditor) {
+        setUserEditor(null);
+        setUserFormError("");
+        setShowUserPassword(false);
+      } else if (menuEditor) {
+        setMenuEditor(null);
+        setMenuFormError("");
+      } else {
+        setUserMenuId(null);
+      }
+    }
+
+    window.addEventListener("keydown", closeUserLayer);
+    return () => window.removeEventListener("keydown", closeUserLayer);
+  }, [expenseDeleteConfirmation, expenseEditor, factoryResetOpen, inventoryDeleteConfirmation, inventoryEditor, menuDeleteConfirmation, menuEditor, restockTarget, userConfirmation, userEditor]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    localStorage.setItem("cocktailliio-theme", dark ? "dark" : "light");
+  }, [dark]);
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+    document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
+    localStorage.setItem("cocktailliio-language", language);
+    localStorage.setItem("cocktailliio-currency", currency);
+  }, [language, currency]);
+
+  function money(amount: number) {
+    return currency === "LBP"
+      ? `${Math.round(amount * exchangeRate).toLocaleString("en-US")} LBP`
+      : `$${amount.toFixed(2)}`;
+  }
+
+  function tr(en: string, ar: string) {
+    return language === "ar" ? ar : en;
+  }
+
+  async function bridgeRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+    if (!printerSettings.token.trim()) throw new Error(tr("Enter the local print-service token in Settings.", "أدخل رمز خدمة الطباعة المحلية في الإعدادات."));
+    const response = await fetch(`${printerSettings.serviceUrl}${path}`, {
+      ...options, cache: "no-store",
+      headers: { "Content-Type": "application/json", "X-Cocktailliio-Token": printerSettings.token.trim(), ...(options.headers ?? {}) },
+    });
+    const payload = await response.json().catch(() => ({})) as { error?: string } & T;
+    if (!response.ok) throw new Error(payload.error || `Print service returned HTTP ${response.status}.`);
+    return payload;
+  }
+
+  function bridgeAmount(amount: number) {
+    return currency === "LBP" ? Math.round(amount * exchangeRate) : amount;
+  }
+
+  function bridgeReceipt(customerReceipt: Receipt) {
+    return {
+      storeName: "Cocktaillo", ...customerReceipt,
+      items: customerReceipt.items.map((item) => ({ ...item, price: bridgeAmount(item.price) })),
+      subtotal: bridgeAmount(customerReceipt.subtotal),
+      discount: customerReceipt.discount ? bridgeAmount(customerReceipt.discount) : undefined,
+      deliveryFee: customerReceipt.deliveryFee ? bridgeAmount(customerReceipt.deliveryFee) : undefined,
+      total: bridgeAmount(customerReceipt.total),
+      cashReceived: customerReceipt.cashReceived !== undefined ? bridgeAmount(customerReceipt.cashReceived) : undefined,
+      change: customerReceipt.change !== undefined ? bridgeAmount(customerReceipt.change) : undefined,
+      currency,
+    };
+  }
+
+  async function sendPrintJob(customerReceipt: Receipt | null, order: KitchenOrder | null, jobId: string, openDrawer: boolean) {
+    if (!printerSettings.printerName) throw new Error(tr("Select the POS80 Windows printer in Settings.", "اختر طابعة POS80 من إعدادات ويندوز."));
+    await bridgeRequest<{ ok: boolean }>("/print", {
+      method: "POST",
+      body: JSON.stringify({
+        jobId, printerName: printerSettings.printerName, paperWidth: printerSettings.paperWidth,
+        copies: customerReceipt ? printerSettings.copies : 1, openDrawer, drawerPin: printerSettings.drawerPin,
+        receipt: customerReceipt ? bridgeReceipt(customerReceipt) : null, kitchen: order,
+      }),
+    });
+  }
+
+  async function refreshPrinters() {
+    setPrintBusy(true); setPrinterError("");
+    try {
+      const payload = await bridgeRequest<{ printers: string[] }>("/printers");
+      setWindowsPrinters(payload.printers); setPrinterStatus("connected");
+      if (!printerSettings.printerName && payload.printers.length === 1) setPrinterSettings((current) => ({ ...current, printerName: payload.printers[0] }));
+      showNotice(tr("Local print service connected", "تم الاتصال بخدمة الطباعة المحلية"));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not connect to the print service.";
+      setPrinterStatus("error"); setPrinterError(message); showNotice(message);
+    } finally { setPrintBusy(false); }
+  }
+
+  async function printCompletedOrder(customerReceipt: Receipt, order: KitchenOrder) {
+    if (!printerSettings.autoPrint) {
+      showNotice(tr(`Order ${customerReceipt.number} saved — automatic printing is disabled`, `تم حفظ الطلب ${customerReceipt.number} — الطباعة التلقائية معطلة`));
+      return;
+    }
+    const shouldOpenDrawer = printerSettings.autoOpenDrawer && (customerReceipt.paymentMethod === "Cash" || printerSettings.openDrawerAllPayments);
+    setPrintBusy(true); setPrinterError(""); setLastFailedPrint(null);
+    try {
+      await sendPrintJob(customerReceipt, order, `order-${customerReceipt.number.replace("#", "")}`, shouldOpenDrawer);
+      setPrinterStatus("connected");
+      showNotice(tr(`Order ${customerReceipt.number} saved and printed`, `تم حفظ وطباعة الطلب ${customerReceipt.number}`));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Printing failed.";
+      setPrinterStatus("error"); setPrinterError(message); setLastFailedPrint({ receipt: customerReceipt, kitchen: order, message });
+      showNotice(tr(`Order ${customerReceipt.number} is saved. Printing failed: ${message}`, `تم حفظ الطلب ${customerReceipt.number}. فشلت الطباعة: ${message}`));
+    } finally { setPrintBusy(false); }
+  }
+
+  async function printReceipt() {
+    const now = new Date();
+    const testReceipt: Receipt = {
+      number: "#TEST", type: "Takeaway", cashier: currentUser?.name ?? "Cocktailliio", createdAt: now.toLocaleString(),
+      items: [{ name: "Printer test", quantity: 1, price: 0 }], subtotal: 0, total: 0, paymentMethod: "Cash",
+    };
+    setPrintBusy(true); setPrinterError("");
+    try {
+      await sendPrintJob(testReceipt, null, `test-${now.getTime()}`, false);
+      setPrinterStatus("connected"); showNotice(tr("Test receipt printed", "تمت طباعة الإيصال التجريبي"));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Test print failed.";
+      setPrinterStatus("error"); setPrinterError(message); showNotice(message);
+    } finally { setPrintBusy(false); }
+  }
+
+  async function printCurrentReceipt() {
+    if (!receipt) return;
+    setPrintBusy(true); setPrinterError("");
+    try {
+      await sendPrintJob(receipt, null, `reprint-${receipt.number.replace("#", "")}-${Date.now()}`, false);
+      setLastFailedPrint(null); setPrinterStatus("connected"); showNotice(tr("Receipt reprinted", "تمت إعادة طباعة الإيصال"));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Reprint failed.";
+      setPrinterStatus("error"); setPrinterError(message); showNotice(message);
+    } finally { setPrintBusy(false); }
+  }
+
+  async function printKitchenReceipt(order: KitchenOrder) {
+    setPrintBusy(true); setPrinterError("");
+    try {
+      await sendPrintJob(null, order, `kitchen-${order.number.replace("#", "")}-${Date.now()}`, false);
+      setPrinterStatus("connected"); showNotice(tr(`Kitchen ticket ${order.number} printed`, `تمت طباعة تذكرة المطبخ ${order.number}`));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Kitchen printing failed.";
+      setPrinterStatus("error"); setPrinterError(message); showNotice(message);
+    } finally { setPrintBusy(false); }
+  }
+
+  async function openCashDrawer() {
+    if (!printerSettings.printerName) {
+      const message = tr("Select the POS80 Windows printer first.", "اختر طابعة POS80 أولاً.");
+      setPrinterError(message); showNotice(message); return;
+    }
+    setPrintBusy(true); setPrinterError("");
+    try {
+      await bridgeRequest<{ ok: boolean }>("/drawer", {
+        method: "POST",
+        body: JSON.stringify({ jobId: `drawer-${Date.now()}`, printerName: printerSettings.printerName, drawerPin: printerSettings.drawerPin }),
+      });
+      setPrinterStatus("connected"); showNotice(tr("Cash drawer command sent", "تم إرسال أمر فتح درج النقود"));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Cash drawer test failed.";
+      setPrinterStatus("error"); setPrinterError(message); showNotice(message);
+    } finally { setPrintBusy(false); }
+  }
+
+  function toggleKitchenOrder(id: number) {
+    setKitchenOrders((current) => current.map((order) => order.id === id
+      ? { ...order, status: order.status === "pending" ? "done" : "pending" }
+      : order));
+  }
+
+  function openAddExpense() {
+    setExpenseForm({ ...emptyExpenseForm, date: getTodayInputValue() });
+    setExpenseFormError("");
+    setExpenseEditor({ mode: "add", id: null });
+  }
+
+  function openEditExpense(expense: Expense) {
+    const displayedAmount = currency === "LBP"
+      ? String(Math.round(expense.amount * exchangeRate))
+      : expense.amount.toFixed(2);
+    setExpenseForm({
+      item: expense.item,
+      category: expense.category,
+      amount: displayedAmount,
+      date: expense.date,
+    });
+    setExpenseFormError("");
+    setExpenseEditor({ mode: "edit", id: expense.id });
+  }
+
+  function closeExpenseEditor() {
+    setExpenseEditor(null);
+    setExpenseForm(emptyExpenseForm);
+    setExpenseFormError("");
+  }
+
+  function submitExpense(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!expenseEditor) return;
+    const item = expenseForm.item.trim().replace(/\s+/g, " ");
+    const enteredAmount = Number(expenseForm.amount.replace(/,/g, "").trim());
+    const existing = expenseEditor.mode === "edit"
+      ? expenses.find((expense) => expense.id === expenseEditor.id)
+      : null;
+
+    if (item.length < 2 || item.length > 80) {
+      setExpenseFormError(tr("Enter a description between 2 and 80 characters.", "أدخل وصفاً من حرفين إلى 80 حرفاً."));
+      return;
+    }
+    if (!expenseForm.amount.trim() || !Number.isFinite(enteredAmount) || enteredAmount <= 0) {
+      setExpenseFormError(tr("Enter a valid amount greater than zero.", "أدخل مبلغاً صحيحاً أكبر من صفر."));
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(expenseForm.date)) {
+      setExpenseFormError(tr("Choose a valid expense date.", "اختر تاريخاً صحيحاً للمصروف."));
+      return;
+    }
+
+    const amount = currency === "LBP" ? enteredAmount / exchangeRate : enteredAmount;
+    const nextExpense: Expense = {
+      id: existing?.id ?? crypto.randomUUID(),
+      item,
+      category: expenseForm.category,
+      amount,
+      date: expenseForm.date,
+      addedBy: existing?.addedBy ?? currentUser?.name ?? "Cocktailliio",
+    };
+    setExpenses((current) => existing
+      ? current.map((expense) => expense.id === existing.id ? nextExpense : expense)
+      : [nextExpense, ...current]);
+    closeExpenseEditor();
+    showNotice(tr(existing ? "Expense updated" : "Expense added", existing ? "تم تعديل المصروف" : "تمت إضافة المصروف"));
+  }
+
+  function deleteExpense() {
+    if (!expenseDeleteConfirmation) return;
+    setExpenses((current) => current.filter((expense) => expense.id !== expenseDeleteConfirmation.id));
+    showNotice(tr("Expense deleted", "تم حذف المصروف"));
+    setExpenseDeleteConfirmation(null);
+  }
+
+  function formatExpenseDate(date: string) {
+    if (date === getTodayInputValue()) return tr("Today", "اليوم");
+    const value = new Date(`${date}T12:00:00`);
+    return new Intl.DateTimeFormat(language === "ar" ? "ar-LB" : "en-LB", { day: "numeric", month: "short", year: "numeric" }).format(value);
+  }
+
+  function openAddInventoryItem() {
+    setInventoryForm(emptyInventoryForm);
+    setInventoryFormError("");
+    setInventoryEditor({ mode: "add", id: null });
+  }
+
+  function openEditInventoryItem(item: InventoryItem) {
+    const displayedCost = currency === "LBP"
+      ? String(Math.round(item.cost * exchangeRate))
+      : item.cost.toFixed(2);
+    setInventoryForm({
+      item: item.item,
+      category: item.category,
+      stock: String(item.stock),
+      unit: item.unit,
+      min: String(item.min),
+      cost: displayedCost,
+    });
+    setInventoryFormError("");
+    setInventoryEditor({ mode: "edit", id: item.id });
+  }
+
+  function closeInventoryEditor() {
+    setInventoryEditor(null);
+    setInventoryForm(emptyInventoryForm);
+    setInventoryFormError("");
+  }
+
+  function submitInventoryItem(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!inventoryEditor) return;
+    const itemName = inventoryForm.item.trim().replace(/\s+/g, " ");
+    const category = inventoryForm.category.trim().replace(/\s+/g, " ");
+    const stock = Number(inventoryForm.stock.replace(/,/g, ""));
+    const min = Number(inventoryForm.min.replace(/,/g, ""));
+    const enteredCost = Number(inventoryForm.cost.replace(/,/g, ""));
+    const existing = inventoryEditor.mode === "edit"
+      ? inventory.find((item) => item.id === inventoryEditor.id)
+      : null;
+    const duplicate = inventory.some((item) => item.id !== existing?.id && item.item.trim().toLowerCase() === itemName.toLowerCase());
+
+    if (itemName.length < 2 || itemName.length > 80) {
+      setInventoryFormError(tr("Enter an item name between 2 and 80 characters.", "أدخل اسم الصنف من حرفين إلى 80 حرفاً."));
+      return;
+    }
+    if (category.length < 2 || category.length > 50) {
+      setInventoryFormError(tr("Enter a category between 2 and 50 characters.", "أدخل فئة من حرفين إلى 50 حرفاً."));
+      return;
+    }
+    if (duplicate) {
+      setInventoryFormError(tr("An inventory item with this name already exists.", "يوجد صنف مخزون بهذا الاسم."));
+      return;
+    }
+    if (![stock, min, enteredCost].every((value) => Number.isFinite(value) && value >= 0)) {
+      setInventoryFormError(tr("Quantity, alert level and cost must be valid positive numbers or zero.", "يجب أن تكون الكمية وحد التنبيه والتكلفة أرقاماً صحيحة موجبة أو صفراً."));
+      return;
+    }
+
+    const cost = currency === "LBP" ? enteredCost / exchangeRate : enteredCost;
+    const nextItem: InventoryItem = {
+      id: existing?.id ?? crypto.randomUUID(),
+      item: itemName,
+      category,
+      stock,
+      unit: inventoryForm.unit,
+      min,
+      cost,
+    };
+    setInventory((current) => existing
+      ? current.map((item) => item.id === existing.id ? nextItem : item)
+      : [...current, nextItem]);
+    closeInventoryEditor();
+    showNotice(tr(existing ? "Inventory item updated" : "Inventory item added", existing ? "تم تعديل صنف المخزون" : "تمت إضافة صنف المخزون"));
+  }
+
+  function deleteInventoryItem() {
+    if (!inventoryDeleteConfirmation) return;
+    setInventory((current) => current.filter((item) => item.id !== inventoryDeleteConfirmation.id));
+    showNotice(tr("Inventory item deleted", "تم حذف صنف المخزون"));
+    setInventoryDeleteConfirmation(null);
+  }
+
+  function openRestock(item: InventoryItem) {
+    setRestockTarget(item);
+    setRestockAmount("");
+    setRestockError("");
+  }
+
+  function closeRestock() {
+    setRestockTarget(null);
+    setRestockAmount("");
+    setRestockError("");
+  }
+
+  function submitRestock(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!restockTarget) return;
+    const amount = Number(restockAmount.replace(/,/g, ""));
+    if (!restockAmount.trim() || !Number.isFinite(amount) || amount <= 0) {
+      setRestockError(tr("Enter a quantity greater than zero.", "أدخل كمية أكبر من صفر."));
+      return;
+    }
+    setInventory((current) => current.map((item) => item.id === restockTarget.id ? { ...item, stock: item.stock + amount } : item));
+    showNotice(tr(`${restockTarget.item} restocked`, `تمت زيادة مخزون ${restockTarget.item}`));
+    closeRestock();
+  }
+
+  function toggleShift() {
+    if (shiftOpen) {
+      setShiftOpen(false);
+      setOpeningCash(null);
+      setOpeningCashInput("");
+      setShiftStartedAt("");
+      setShiftOpenedBy("");
+      showNotice(tr("Shift closed and summary saved", "تم إغلاق الدوام وحفظ الملخص"));
+      return;
+    }
+    const rawOpeningCash = openingCashInput.replace(/,/g, "").trim();
+    const amount = Number(rawOpeningCash);
+    if (!rawOpeningCash || Number.isNaN(amount) || amount < 0) {
+      showNotice(tr("Enter a valid opening cash amount", "أدخل مبلغًا صحيحًا"));
+      return;
+    }
+    setOpeningCash(currency === "LBP" ? amount / exchangeRate : amount);
+    setShiftOpen(true);
+    setShiftStartedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+    setShiftOpenedBy(currentUser?.name ?? tr("Current user", "المستخدم الحالي"));
+    setOpeningCashInput("");
+    showNotice(tr("Shift opened successfully", "تم فتح الدوام بنجاح"));
+  }
+
+  function exportExcel() {
+    const esc = (value: string | number) => String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const cell = (value: string | number, type = "String", style = "") => `<Cell${style ? ` ss:StyleID="${style}"` : ""}><Data ss:Type="${type}">${esc(value)}</Data></Cell>`;
+    const row = (values: (string | number)[], header = false) => `<Row>${values.map((value) => cell(value, typeof value === "number" ? "Number" : "String", header ? "Header" : "")).join("")}</Row>`;
+    const expenseTotal = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const sales = period === "Daily" ? salesTotal : period === "Monthly" ? 34680 : 392440;
+    const xml = `<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+      <Styles><Style ss:ID="Default"><Alignment ss:Vertical="Center"/><Font ss:FontName="Arial" ss:Size="10"/></Style><Style ss:ID="Header"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#921414" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center"/></Style><Style ss:ID="Title"><Font ss:Bold="1" ss:Size="18" ss:Color="#921414"/></Style></Styles>
+      <Worksheet ss:Name="Summary"><Table><Column ss:Width="180"/><Column ss:Width="130"/><Row ss:Height="30">${cell(`Cocktailliio ${period} Report`, "String", "Title")}</Row>${row(["Generated", new Date().toLocaleString()])}${row(["Period", period])}${row(["Gross sales (USD)", sales])}${row(["Expenses (USD)", expenseTotal])}${row(["Estimated net (USD)", sales - expenseTotal])}${row(["Orders", period === "Daily" ? orders : period === "Monthly" ? 1146 : 13204])}</Table></Worksheet>
+      <Worksheet ss:Name="Expenses"><Table><Column ss:Width="190"/><Column ss:Width="110"/><Column ss:Width="100"/><Column ss:Width="130"/><Column ss:Width="100"/>${row(["Description","Category","Date","Added by","Amount USD"], true)}${expenses.map((expense) => row([expense.item,expense.category,expense.date,expense.addedBy,expense.amount])).join("")}${row(["TOTAL","","","",expenseTotal], true)}</Table></Worksheet>
+      <Worksheet ss:Name="Inventory"><Table><Column ss:Width="170"/><Column ss:Width="110"/><Column ss:Width="80"/><Column ss:Width="70"/><Column ss:Width="90"/><Column ss:Width="90"/><Column ss:Width="100"/><Column ss:Width="100"/>${row(["Item","Category","Quantity","Unit","Alert at","Status","Cost per unit USD","Stock value USD"], true)}${inventory.map((item) => row([item.item,item.category,item.stock,item.unit,item.min,item.stock <= item.min ? "LOW STOCK" : "In stock",item.cost,item.stock * item.cost])).join("")}</Table></Worksheet>
+      <Worksheet ss:Name="Menu"><Table><Column ss:Width="180"/><Column ss:Width="100"/><Column ss:Width="100"/><Column ss:Width="110"/><Column ss:Width="110"/>${row(["Menu item","Category","Price USD","Availability","Customizable"], true)}${menuItems.map((item) => row([item.name,item.category,item.price,item.available ? "Available" : "Hidden",item.customizable ? "Yes" : "No"])).join("")}</Table></Worksheet>
+      <Worksheet ss:Name="Toppings"><Table><Column ss:Width="180"/><Column ss:Width="100"/><Column ss:Width="110"/>${row(["Topping","Price USD","Availability"], true)}${toppings.map((topping) => row([`${topping.emoji} ${topping.name}`,topping.price,topping.available ? "Available" : "Hidden"])).join("")}</Table></Worksheet>
+    </Workbook>`;
+    const blob = new Blob([xml], { type: "application/vnd.ms-excel" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Cocktailliio-${period}-${new Date().toISOString().slice(0, 10)}.xls`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showNotice(`${period} Excel report exported`);
+  }
+
+  function handleLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!accountsReady) return;
+    const username = loginForm.username.trim().toLowerCase();
+    const account = accounts.find((user) => (
+      user.active
+      && user.username.toLowerCase() === username
+      && user.password === loginForm.password
+    ));
+    if (!account) {
+      setLoginError(tr("Incorrect username or password.", "اسم المستخدم أو كلمة المرور غير صحيحة."));
+      return;
+    }
+    setCurrentUserId(account.id);
+    setView(account.role === "manager" ? "dashboard" : "shift");
+    setLoginForm({ username: "", password: "" });
+    setLoginError("");
+    setShowPassword(false);
+    showNotice(account.role === "manager"
+      ? tr("Manager access enabled", "تم تفعيل صلاحيات المدير")
+      : tr("Cashier signed in — open your shift to begin", "تم تسجيل دخول الكاشير — افتح الدوام للبدء"));
+  }
+
+  function logout() {
+    if (shiftOpen) {
+      setView("shift");
+      showNotice(tr("Close the open shift before signing out", "أغلق الدوام المفتوح قبل تسجيل الخروج"));
+      return;
+    }
+    setCurrentUserId(null);
+    setView("dashboard");
+    setLoginForm({ username: "", password: "" });
+    setLoginError("");
+    setShowPassword(false);
+  }
+
+  function openAddUser() {
+    setUserMenuId(null);
+    setUserForm(emptyUserForm);
+    setUserFormError("");
+    setShowUserPassword(false);
+    setUserEditor({ mode: "add", userId: null });
+  }
+
+  function openEditUser(user: UserAccount) {
+    setUserMenuId(null);
+    setUserForm({
+      name: user.name,
+      username: user.username,
+      password: "",
+      confirmPassword: "",
+      role: user.role,
+      active: user.active,
+    });
+    setUserFormError("");
+    setShowUserPassword(false);
+    setUserEditor({ mode: "edit", userId: user.id });
+  }
+
+  function closeUserEditor() {
+    setUserEditor(null);
+    setUserForm(emptyUserForm);
+    setUserFormError("");
+    setShowUserPassword(false);
+  }
+
+  function submitUser(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!userEditor) return;
+
+    const cleanName = userForm.name.trim().replace(/\s+/g, " ");
+    const cleanUsername = userForm.username.trim().toLowerCase();
+    const existing = userEditor.mode === "edit"
+      ? accounts.find((account) => account.id === userEditor.userId)
+      : null;
+    const duplicateUsername = accounts.some((account) => (
+      account.id !== existing?.id
+      && account.username.toLowerCase() === cleanUsername
+    ));
+
+    if (cleanName.length < 2 || cleanName.length > 60) {
+      setUserFormError(tr("Enter a name between 2 and 60 characters.", "أدخل اسماً من حرفين إلى 60 حرفاً."));
+      return;
+    }
+    if (!/^[a-z0-9][a-z0-9._-]{2,23}$/.test(cleanUsername)) {
+      setUserFormError(tr(
+        "Username must be 3–24 characters using letters, numbers, dot, dash or underscore.",
+        "اسم المستخدم يجب أن يكون من 3 إلى 24 حرفاً ويحتوي أحرفاً إنجليزية أو أرقاماً أو . أو - أو _.",
+      ));
+      return;
+    }
+    if (duplicateUsername) {
+      setUserFormError(tr("Username is already in use.", "اسم المستخدم مستخدم بالفعل."));
+      return;
+    }
+
+    const passwordRequired = userEditor.mode === "add";
+    const passwordChanged = Boolean(userForm.password || userForm.confirmPassword);
+    if (passwordRequired || passwordChanged) {
+      if (userForm.password !== userForm.password.trim() || userForm.password.length < 4 || userForm.password.length > 64) {
+        setUserFormError(tr(
+          "Password must be 4–64 characters with no spaces at the beginning or end.",
+          "كلمة المرور يجب أن تكون من 4 إلى 64 حرفاً ومن دون فراغات في البداية أو النهاية.",
+        ));
+        return;
+      }
+      if (userForm.password !== userForm.confirmPassword) {
+        setUserFormError(tr("Passwords do not match.", "كلمتا المرور غير متطابقتين."));
+        return;
+      }
+    }
+
+    if (userEditor.mode === "edit") {
+      if (!existing) {
+        closeUserEditor();
+        showNotice(tr("User no longer exists.", "المستخدم لم يعد موجوداً."));
+        return;
+      }
+      if (existing.id === currentUserId && (userForm.role !== existing.role || !userForm.active)) {
+        setUserFormError(tr(
+          "You cannot remove your own access while signed in.",
+          "لا يمكنك إزالة صلاحيات حسابك أثناء تسجيل الدخول.",
+        ));
+        return;
+      }
+      const removesActiveManager = existing.role === "manager"
+        && existing.active
+        && (userForm.role !== "manager" || !userForm.active);
+      const otherActiveManagers = accounts.filter((account) => (
+        account.id !== existing.id && account.role === "manager" && account.active
+      )).length;
+      if (removesActiveManager && otherActiveManagers === 0) {
+        setUserFormError(tr(
+          "Add another active manager before changing this account.",
+          "أضف مديراً آخر مفعّلاً قبل تغيير هذا الحساب.",
+        ));
+        return;
+      }
+
+      const updatedAccount: UserAccount = {
+        ...existing,
+        name: cleanName,
+        initials: makeInitials(cleanName),
+        username: cleanUsername,
+        password: passwordChanged ? userForm.password : existing.password,
+        role: userForm.role,
+        active: userForm.active,
+      };
+      setAccounts((current) => current.map((account) => account.id === existing.id ? updatedAccount : account));
+      closeUserEditor();
+      showNotice(tr(`${cleanName} updated`, `تم تعديل ${cleanName}`));
+      return;
+    }
+
+    const newAccount: UserAccount = {
+      id: typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `user-${Date.now()}`,
+      name: cleanName,
+      initials: makeInitials(cleanName),
+      username: cleanUsername,
+      password: userForm.password,
+      role: userForm.role,
+      active: userForm.active,
+    };
+    setAccounts((current) => [...current, newAccount]);
+    closeUserEditor();
+    showNotice(tr(`${cleanName} added and ready to sign in`, `تمت إضافة ${cleanName} وأصبح الحساب جاهزاً للدخول`));
+  }
+
+  function canRemoveUserAccess(user: UserAccount) {
+    if (user.id === currentUserId) {
+      showNotice(tr("You cannot deactivate or delete your own account.", "لا يمكنك تعطيل أو حذف حسابك الحالي."));
+      return false;
+    }
+    const otherActiveManagers = accounts.filter((account) => (
+      account.id !== user.id && account.role === "manager" && account.active
+    )).length;
+    if (user.role === "manager" && user.active && otherActiveManagers === 0) {
+      showNotice(tr("At least one active manager is required.", "يجب أن يبقى مدير واحد مفعّلاً على الأقل."));
+      return false;
+    }
+    return true;
+  }
+
+  function requestUserConfirmation(kind: "deactivate" | "delete", user: UserAccount) {
+    setUserMenuId(null);
+    if (!canRemoveUserAccess(user)) return;
+    setUserConfirmation({ kind, userId: user.id });
+  }
+
+  function activateUser(user: UserAccount) {
+    setUserMenuId(null);
+    setAccounts((current) => current.map((account) => account.id === user.id ? { ...account, active: true } : account));
+    showNotice(tr(`${user.name} activated`, `تم تفعيل ${user.name}`));
+  }
+
+  function confirmUserChange() {
+    if (!userConfirmation) return;
+    const target = accounts.find((account) => account.id === userConfirmation.userId);
+    if (!target) {
+      setUserConfirmation(null);
+      showNotice(tr("User no longer exists.", "المستخدم لم يعد موجوداً."));
+      return;
+    }
+    if (!canRemoveUserAccess(target)) {
+      setUserConfirmation(null);
+      return;
+    }
+
+    if (userConfirmation.kind === "deactivate") {
+      setAccounts((current) => current.map((account) => (
+        account.id === target.id ? { ...account, active: false } : account
+      )));
+      showNotice(tr(`${target.name} deactivated`, `تم تعطيل ${target.name}`));
+    } else {
+      setAccounts((current) => current.filter((account) => account.id !== target.id));
+      showNotice(tr(`${target.name} deleted`, `تم حذف ${target.name}`));
+    }
+    setUserConfirmation(null);
+  }
+
+  function openAddMenuEntry(kind: "item" | "topping") {
+    setMenuFormError("");
+    if (kind === "item") {
+      setMenuItemForm(emptyMenuItemForm);
+      setMenuEditor({ kind, mode: "add", id: null });
+    } else {
+      setToppingForm(emptyToppingForm);
+      setMenuEditor({ kind, mode: "add", id: null });
+    }
+  }
+
+  function openEditMenuItem(item: MenuItem) {
+    setMenuFormError("");
+    setMenuItemForm({
+      name: item.name,
+      description: item.description,
+      price: String(item.price),
+      image: item.image,
+      category: item.category,
+      available: item.available,
+      customizable: item.customizable,
+    });
+    setMenuEditor({ kind: "item", mode: "edit", id: item.id });
+  }
+
+  function openEditTopping(topping: Topping) {
+    setMenuFormError("");
+    setToppingForm({
+      name: topping.name,
+      price: String(topping.price),
+      emoji: topping.emoji,
+      available: topping.available,
+    });
+    setMenuEditor({ kind: "topping", mode: "edit", id: topping.id });
+  }
+
+  function closeMenuEditor() {
+    setMenuEditor(null);
+    setMenuItemForm(emptyMenuItemForm);
+    setToppingForm(emptyToppingForm);
+    setMenuFormError("");
+  }
+
+  function submitMenuEntry(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!menuEditor) return;
+
+    if (menuEditor.kind === "item") {
+      const name = menuItemForm.name.trim().replace(/\s+/g, " ");
+      const description = menuItemForm.description.trim().replace(/\s+/g, " ");
+      const image = menuItemForm.image.trim();
+      const price = Number(menuItemForm.price.replace(",", "."));
+      const existing = menuEditor.mode === "edit"
+        ? menuItems.find((item) => item.id === menuEditor.id)
+        : null;
+      const duplicate = menuItems.some((item) => item.id !== existing?.id && item.name.trim().toLowerCase() === name.toLowerCase());
+
+      if (name.length < 2 || name.length > 60) {
+        setMenuFormError(tr("Enter an item name between 2 and 60 characters.", "أدخل اسم الصنف من حرفين إلى 60 حرفاً."));
+        return;
+      }
+      if (!menuItemForm.price.trim() || !Number.isFinite(price) || price < 0 || price > 10000) {
+        setMenuFormError(tr("Enter a valid USD price between 0 and 10,000.", "أدخل سعراً صحيحاً بالدولار بين 0 و10,000."));
+        return;
+      }
+      if (duplicate) {
+        setMenuFormError(tr("A menu item with this name already exists.", "يوجد صنف بهذا الاسم بالفعل."));
+        return;
+      }
+      if (image && !/^(https?:\/\/|\/)/i.test(image)) {
+        setMenuFormError(tr("Photo must be a valid web URL, or leave it blank.", "يجب أن تكون الصورة رابطاً صحيحاً، أو اتركها فارغة."));
+        return;
+      }
+
+      const nextItem: MenuItem = {
+        id: existing?.id ?? (typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `menu-${Date.now()}`),
+        name,
+        description,
+        price,
+        image,
+        category: menuItemForm.category,
+        available: menuItemForm.available,
+        customizable: menuItemForm.customizable,
+      };
+      setMenuItems((current) => existing
+        ? current.map((item) => item.id === existing.id ? nextItem : item)
+        : [...current, nextItem]);
+      closeMenuEditor();
+      showNotice(tr(
+        existing ? `${name} updated` : `${name} added to the menu`,
+        existing ? `تم تعديل ${name}` : `تمت إضافة ${name} إلى القائمة`,
+      ));
+      return;
+    }
+
+    const name = toppingForm.name.trim().replace(/\s+/g, " ");
+    const price = Number(toppingForm.price.replace(",", "."));
+    const existing = menuEditor.mode === "edit"
+      ? toppings.find((topping) => topping.id === menuEditor.id)
+      : null;
+    const duplicate = toppings.some((topping) => topping.id !== existing?.id && topping.name.trim().toLowerCase() === name.toLowerCase());
+
+    if (name.length < 2 || name.length > 60) {
+      setMenuFormError(tr("Enter a topping name between 2 and 60 characters.", "أدخل اسم الإضافة من حرفين إلى 60 حرفاً."));
+      return;
+    }
+    if (!toppingForm.price.trim() || !Number.isFinite(price) || price < 0 || price > 10000) {
+      setMenuFormError(tr("Enter a valid USD price between 0 and 10,000.", "أدخل سعراً صحيحاً بالدولار بين 0 و10,000."));
+      return;
+    }
+    if (duplicate) {
+      setMenuFormError(tr("A topping with this name already exists.", "توجد إضافة بهذا الاسم بالفعل."));
+      return;
+    }
+
+    const nextTopping: Topping = {
+      id: existing?.id ?? (typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `topping-${Date.now()}`),
+      name,
+      price,
+      emoji: toppingForm.emoji.trim() || "✦",
+      available: toppingForm.available,
+    };
+    setToppings((current) => existing
+      ? current.map((topping) => topping.id === existing.id ? nextTopping : topping)
+      : [...current, nextTopping]);
+    closeMenuEditor();
+    showNotice(tr(
+      existing ? `${name} updated` : `${name} topping added`,
+      existing ? `تم تعديل ${name}` : `تمت إضافة ${name}`,
+    ));
+  }
+
+  function toggleMenuEntry(kind: "item" | "topping", id: string) {
+    if (kind === "item") {
+      const target = menuItems.find((item) => item.id === id);
+      if (!target) return;
+      setMenuItems((current) => current.map((item) => item.id === id ? { ...item, available: !item.available } : item));
+      showNotice(tr(`${target.name} ${target.available ? "hidden" : "available"}`, `${target.name} ${target.available ? "مخفي" : "متاح"}`));
+      return;
+    }
+    const target = toppings.find((topping) => topping.id === id);
+    if (!target) return;
+    setToppings((current) => current.map((topping) => topping.id === id ? { ...topping, available: !topping.available } : topping));
+    showNotice(tr(`${target.name} ${target.available ? "hidden" : "available"}`, `${target.name} ${target.available ? "مخفي" : "متاح"}`));
+  }
+
+  function confirmMenuDelete() {
+    if (!menuDeleteConfirmation) return;
+    if (menuDeleteConfirmation.kind === "item") {
+      setMenuItems((current) => current.filter((item) => item.id !== menuDeleteConfirmation.id));
+    } else {
+      setToppings((current) => current.filter((topping) => topping.id !== menuDeleteConfirmation.id));
+    }
+    showNotice(tr(`${menuDeleteConfirmation.name} deleted`, `تم حذف ${menuDeleteConfirmation.name}`));
+    setMenuDeleteConfirmation(null);
+  }
+
+  function showNotice(message: string) {
+    setNotice(message);
+    window.setTimeout(() => setNotice(""), 2600);
+  }
+
+  function navigate(next: View) {
+    const item = nav.find((entry) => entry.id === next);
+    if (role === "cashier" && item?.manager) {
+      showNotice("Manager permission required");
+      return;
+    }
+    setView(next);
+  }
+
+  function performFactoryReset() {
+    const cleanTables = initialTables.map(({ number, seats }) => ({ number, seats, status: "available" as const }));
+
+    localStorage.setItem(userStorageKey, JSON.stringify(initialUserAccounts));
+    localStorage.setItem(expenseStorageKey, JSON.stringify([]));
+    localStorage.setItem(inventoryStorageKey, JSON.stringify([]));
+    localStorage.setItem(salesStorageKey, JSON.stringify({ salesTotal: 0, orders: 0, nextOrderNumber: 1, recentOrders: [] } satisfies SalesSnapshot));
+    localStorage.setItem(tablesStorageKey, JSON.stringify(cleanTables));
+    localStorage.setItem(kitchenStorageKey, JSON.stringify([]));
+    localStorage.removeItem("cocktailliio-theme");
+    localStorage.removeItem("cocktailliio-currency");
+    localStorage.removeItem("cocktailliio-language");
+
+    setAccounts(initialUserAccounts);
+    setExpenses([]);
+    setInventory([]);
+    setTables(cleanTables);
+    setKitchenOrders([]);
+    setReceipt(null);
+    setReceiptPreviewOpen(false);
+    setShiftOpen(false);
+    setOpeningCash(null);
+    setOpeningCashInput("");
+    setShiftStartedAt("");
+    setShiftOpenedBy("");
+    setCounterOrderType(null);
+    setCounterTable(null);
+    setOrderContact({ name: "", phone: "", address: "", driver: "" });
+    setSelectedMenuItem(null);
+    setSelectedToppingIds([]);
+    setOrderToppings([]);
+    setToppingStep(0);
+    setNextOrderNumber(1);
+    setOrders(0);
+    setSalesTotal(0);
+    setRecentOrders([]);
+    setDark(false);
+    setCurrency("USD");
+    setLanguage("en");
+    setExchangeRate(89500);
+    setFactoryResetOpen(false);
+    setView("dashboard");
+    setCurrentUserId(null);
+    setLoginForm({ username: "", password: "" });
+    setLoginError("");
+    showNotice("Factory reset complete — menu items and toppings were preserved");
+  }
+
+  const lowStock = inventory.filter((item) => item.stock <= item.min);
+  const availableTables = tables.filter((table) => table.status === "available").length;
+  const todayKey = getTodayInputValue();
+  const todayExpenses = expenses.filter((expense) => expense.date === todayKey);
+  const monthExpenses = expenses.filter((expense) => expense.date.startsWith(todayKey.slice(0, 7)));
+  const topExpenseCategory = expenseCategories
+    .map((category) => ({ category, total: expenses.filter((expense) => expense.category === category).reduce((sum, expense) => sum + expense.amount, 0) }))
+    .sort((a, b) => b.total - a.total)[0]?.category ?? "Other";
+  const availableMenuItems = menuItems.filter((item) => item.available);
+  const visibleMenuItems = posMenuFilter === "All"
+    ? availableMenuItems
+    : availableMenuItems.filter((item) => item.category === posMenuFilter);
+  const availableToppings = toppings.filter((topping) => topping.available);
+  const currentTopping = orderToppings[toppingStep];
+  const selectedCheeseTotal = orderToppings
+    .filter((topping) => selectedToppingIds.includes(topping.id) && topping.price > 0)
+    .reduce((sum, topping) => sum + topping.price, 0);
+  const selectedTotal = (selectedMenuItem?.price ?? 0) + selectedCheeseTotal;
+  const contactName = orderContact.name.trim();
+  const contactPhone = orderContact.phone.trim();
+  const contactAddress = orderContact.address.trim();
+  const counterServiceReady = (counterOrderType === "Dine-in" && counterTable !== null)
+    || (counterOrderType === "Takeaway" && Boolean(contactName && contactPhone))
+    || (counterOrderType === "Delivery" && Boolean(contactName && contactPhone && contactAddress));
+
+  function completeOrder(item: MenuItem, chosenToppings: Topping[]) {
+    if (!counterOrderType || completionLock.current) return;
+    const cheeseAddOns = chosenToppings.filter((topping) => topping.price > 0);
+    const total = item.price + cheeseAddOns.reduce((sum, topping) => sum + topping.price, 0);
+    const enteredCash = cashReceivedInput.trim() ? Number(cashReceivedInput) : total;
+    if (paymentMethod === "Cash" && (!Number.isFinite(enteredCash) || enteredCash < total)) {
+      showNotice(tr(`Cash received must be at least ${money(total)}`, `يجب أن يكون المبلغ المستلم ${money(total)} على الأقل`));
+      return;
+    }
+    completionLock.current = true;
+    const number = `#${nextOrderNumber}`;
+    const now = new Date();
+    const receiptLines: ReceiptLine[] = [
+      { name: item.name, quantity: 1, price: item.price },
+      ...cheeseAddOns.map((cheese) => ({ name: cheese.name, quantity: 1, price: cheese.price })),
+    ];
+    const toppingNotes = chosenToppings.map((topping) => topping.name);
+    const customizationNotes = chosenToppings.map((topping) => topping.price > 0 ? `${topping.name} (+${money(topping.price)})` : topping.name);
+    const kitchenCustomer = counterOrderType === "Dine-in" && counterTable !== null ? `Table ${counterTable}` : `${counterOrderType} · ${contactName}`;
+    const kitchenOrder: KitchenOrder = {
+      id: nextOrderNumber, number, type: counterOrderType,
+      items: [item.name, ...customizationNotes.map((name) => `+ ${name}`)],
+      status: "pending", time: now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }), customer: kitchenCustomer,
+    };
+    const completedReceipt: Receipt = {
+      number, type: counterOrderType,
+      table: counterOrderType === "Dine-in" ? counterTable ?? undefined : undefined,
+      cashier: currentUser?.name ?? "Cocktailliio", createdAt: now.toLocaleString(),
+      customer: counterOrderType === "Dine-in" ? undefined : contactName,
+      phone: counterOrderType === "Dine-in" ? undefined : contactPhone,
+      address: counterOrderType === "Delivery" ? contactAddress : undefined,
+      driver: counterOrderType === "Delivery" ? orderContact.driver.trim() || tr("Not assigned", "غير محدد") : undefined,
+      items: receiptLines, notes: toppingNotes, subtotal: total, total, paymentMethod,
+      cashReceived: paymentMethod === "Cash" ? enteredCash : undefined,
+      change: paymentMethod === "Cash" ? enteredCash - total : undefined,
+    };
+    const nextKitchenOrders = [kitchenOrder, ...kitchenOrders];
+    const nextRecentOrders: RecentOrder[] = [{
+      number,
+      type: counterOrderType === "Dine-in" && counterTable !== null ? `Table ${counterTable}` : counterOrderType,
+      cashier: currentUser?.name ?? "Cocktailliio", time: now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+      status: "Preparing" as const, total,
+    }, ...recentOrders].slice(0, 20);
+    const nextTables = counterOrderType === "Dine-in" && counterTable !== null
+      ? tables.map((table) => table.number === counterTable ? { ...table, status: "occupied" as const, order: number, total } : table)
+      : tables;
+    const nextSales: SalesSnapshot = {
+      salesTotal: salesTotal + total, orders: orders + 1, nextOrderNumber: nextOrderNumber + 1, recentOrders: nextRecentOrders,
+    };
+
+    try {
+      localStorage.setItem(kitchenStorageKey, JSON.stringify(nextKitchenOrders));
+      localStorage.setItem(salesStorageKey, JSON.stringify(nextSales));
+      if (nextTables !== tables) localStorage.setItem(tablesStorageKey, JSON.stringify(nextTables));
+    } catch {
+      completionLock.current = false;
+      showNotice(tr("The order could not be saved on this device. Please try again.", "تعذر حفظ الطلب على هذا الجهاز. حاول مرة أخرى."));
+      return;
+    }
+
+    setKitchenOrders(nextKitchenOrders); setRecentOrders(nextRecentOrders); setTables(nextTables);
+    setReceipt(completedReceipt); setNextOrderNumber(nextSales.nextOrderNumber);
+    setOrders(nextSales.orders); setSalesTotal(nextSales.salesTotal); setReceiptPreviewOpen(true);
+    setSelectedMenuItem(null); setSelectedToppingIds([]); setOrderToppings([]); setToppingStep(0);
+    void printCompletedOrder(completedReceipt, kitchenOrder);
+  }
+
+  function beginMenuItem(item: MenuItem) {
+    if (!shiftOpen) {
+      showNotice("Open your shift before taking orders");
+      setView("shift");
+      return;
+    }
+    if (!counterOrderType) {
+      showNotice(tr("Choose Dine-in, Takeaway or Delivery first", "اختر داخل المطعم أو سفري أو توصيل أولاً"));
+      return;
+    }
+    if (counterOrderType === "Dine-in" && counterTable === null) {
+      showNotice(tr("Choose a table number first", "اختر رقم الطاولة أولاً"));
+      return;
+    }
+    if (counterOrderType === "Takeaway" && (!contactName || !contactPhone)) {
+      showNotice(tr("Add the pickup name and phone first", "أدخل اسم ورقم هاتف طلب الاستلام أولاً"));
+      return;
+    }
+    if (counterOrderType === "Delivery" && (!contactName || !contactPhone || !contactAddress)) {
+      showNotice(tr("Add the delivery name, phone and address first", "أدخل اسم ورقم هاتف وعنوان طلب التوصيل أولاً"));
+      return;
+    }
+    if (!item.available) {
+      showNotice(tr("This menu item is currently unavailable", "هذا الصنف غير متوفر حالياً"));
+      return;
+    }
+    if (!item.customizable || availableToppings.length === 0) {
+      completeOrder(item, []);
+      return;
+    }
+    setSelectedMenuItem({ ...item });
+    setOrderToppings(availableToppings.map((topping) => ({ ...topping })));
+    setToppingStep(0);
+    setSelectedToppingIds([]);
+  }
+
+  function answerTopping(yes: boolean) {
+    if (!selectedMenuItem || !counterOrderType || !currentTopping) return;
+    const kind = toppingKind(currentTopping);
+    const limit = toppingLimit(selectedMenuItem, currentTopping);
+    const selectedInGroup = selectedToppingIds.filter((id) => {
+      const topping = orderToppings.find((entry) => entry.id === id);
+      return topping ? toppingKind(topping) === kind : false;
+    }).length;
+    const canSelect = !selectedToppingIds.includes(currentTopping.id) && selectedInGroup < limit;
+    const nextSelectedIds = yes && canSelect
+      ? [...selectedToppingIds, currentTopping.id]
+      : selectedToppingIds;
+    const nextSelectedInGroup = selectedInGroup + (yes && canSelect ? 1 : 0);
+
+    let nextStep = toppingStep + 1;
+    if (nextSelectedInGroup >= limit) {
+      while (nextStep < orderToppings.length && toppingKind(orderToppings[nextStep]) === kind) nextStep += 1;
+    }
+
+    const leavingRequiredGroup = (kind === "pasta" || kind === "sauce")
+      && (nextStep >= orderToppings.length || toppingKind(orderToppings[nextStep]) !== kind);
+    if (leavingRequiredGroup && nextSelectedInGroup < limit) {
+      const firstUnselected = orderToppings.findIndex((topping) => toppingKind(topping) === kind && !nextSelectedIds.includes(topping.id));
+      setSelectedToppingIds(nextSelectedIds);
+      setToppingStep(firstUnselected >= 0 ? firstUnselected : toppingStep);
+      showNotice(kind === "pasta"
+        ? tr("Choose one pasta type", "اختر نوع باستا واحداً")
+        : tr(`Choose ${limit} sauce${limit === 1 ? "" : "s"}`, `اختر ${limit} من الصلصات`));
+      return;
+    }
+
+    const chosenToppings = orderToppings.filter((topping) => nextSelectedIds.includes(topping.id));
+    if (nextStep >= orderToppings.length) {
+      completeOrder(selectedMenuItem, chosenToppings);
+      return;
+    }
+    setSelectedToppingIds(nextSelectedIds);
+    setToppingStep(nextStep);
+  }
+
+  function startNextOrder() {
+    completionLock.current = false;
+    setReceiptPreviewOpen(false);
+    setReceipt(null);
+    setCounterOrderType(null);
+    setCounterTable(null);
+    setOrderContact({ name: "", phone: "", address: "", driver: "" });
+    setPaymentMethod("Cash");
+    setCashReceivedInput("");
+    setSelectedMenuItem(null);
+    setSelectedToppingIds([]);
+    setOrderToppings([]);
+    setToppingStep(0);
+  }
+
+  function updateTable(number: number) {
+    setTables((current) => current.map((table) => {
+      if (table.number !== number) return table;
+      const next: TableStatus = table.status === "available" ? "occupied" : table.status === "occupied" ? "reserved" : "available";
+      return { ...table, status: next, order: next === "occupied" ? `#${1040 + number}` : undefined, total: next === "occupied" ? 18.5 : undefined };
+    }));
+  }
+
+  if (!currentUser) {
+    return (
+      <main className="auth-screen">
+        <section className="auth-brand" aria-label="Cocktaillo">
+          <div className="auth-brand-logo"><img src="/cocktaillo-logo.png" alt="Cocktaillo Resto Café"/></div>
+          <div>
+            <p>{tr("RESTO CAFÉ • LOUNGE • HOOKAH • COCKTAILS", "مطعم ومقهى ولاونج وأرجيلة وكوكتيلات")}</p>
+            <h1>{tr("One clear start for every shift.", "دخول واضح لكل دوام.")}</h1>
+            <span>{tr(
+              "Cashiers open only the tools they need. Managers enter with their own account for full control.",
+              "يفتح الكاشير الأدوات التي يحتاجها فقط، ويدخل المدير بحسابه الخاص للتحكم الكامل.",
+            )}</span>
+          </div>
+          <small>Cocktaillo POS • v1.0</small>
+        </section>
+        <section className="auth-panel">
+          <div className="auth-language">
+            <button type="button" onClick={() => setLanguage((current) => current === "en" ? "ar" : "en")}>
+              {language === "en" ? "عربي" : "EN"}
+            </button>
+            <button type="button" onClick={() => setDark((current) => !current)} aria-label={tr("Toggle theme", "تغيير المظهر")}>
+              {dark ? "☀" : "◐"}
+            </button>
+          </div>
+          <div className="auth-card">
+            <div className="auth-mobile-brand"><img src="/cocktaillo-logo.png" alt="Cocktaillo Resto Café"/></div>
+            <p className="page-kicker">{tr("STAFF SIGN IN", "دخول الموظفين")}</p>
+            <h2>{tr("Welcome back", "أهلاً بعودتك")}</h2>
+            <p>{tr(
+              "Enter your staff username and password. Your correct access opens automatically.",
+              "أدخل اسم المستخدم وكلمة المرور. ستفتح صلاحيات حسابك تلقائياً.",
+            )}</p>
+            <form className="auth-form" onSubmit={handleLogin}>
+              <label className="auth-field">
+                {tr("Username", "اسم المستخدم")}
+                <input
+                  autoFocus
+                  autoComplete="username"
+                  dir="ltr"
+                  value={loginForm.username}
+                  onChange={(event) => {
+                    setLoginForm((current) => ({ ...current, username: event.target.value }));
+                    setLoginError("");
+                  }}
+                  placeholder={tr("Enter username", "أدخل اسم المستخدم")}
+                />
+              </label>
+              <label className="auth-field">
+                {tr("Password", "كلمة المرور")}
+                <span className="password-field">
+                  <input
+                    autoComplete="current-password"
+                    dir="ltr"
+                    type={showPassword ? "text" : "password"}
+                    value={loginForm.password}
+                    onChange={(event) => {
+                      setLoginForm((current) => ({ ...current, password: event.target.value }));
+                      setLoginError("");
+                    }}
+                    placeholder={tr("Enter password", "أدخل كلمة المرور")}
+                  />
+                  <button type="button" className="password-toggle" onClick={() => setShowPassword((current) => !current)}>
+                    {showPassword ? tr("Hide", "إخفاء") : tr("Show", "إظهار")}
+                  </button>
+                </span>
+              </label>
+              {loginError && <p className="auth-error" role="alert">{loginError}</p>}
+              <button className="auth-submit" type="submit" disabled={!accountsReady || !loginForm.username.trim() || !loginForm.password}>
+                {tr("Sign in to Cocktaillo", "تسجيل الدخول إلى كوكتايلو")} <span>→</span>
+              </button>
+            </form>
+            <div className="auth-security-note">
+              <span>⌾</span>
+              <p><strong>{tr("Role-based access", "دخول حسب الصلاحية")}</strong>{tr(
+                "Cashier accounts cannot open inventory, menu management, expenses, reports, users or settings.",
+                "لا يستطيع حساب الكاشير فتح المخزون أو إدارة القائمة أو المصاريف أو التقارير أو المستخدمين أو الإعدادات.",
+              )}</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  const title = language === "ar" ? arabicNav[view] : nav.find((item) => item.id === view)?.label ?? "Cocktaillo";
+  const confirmationUser = userConfirmation
+    ? accounts.find((account) => account.id === userConfirmation.userId) ?? null
+    : null;
+
+  return (
+    <div className="system-shell">
+      {notice && <div className="toast">{notice}</div>}
+      {receiptPreviewOpen && receipt && (
+        <div className="sale-receipt-backdrop" role="presentation">
+          <section className="sale-receipt-dialog" role="dialog" aria-modal="true" aria-labelledby="receipt-preview-title">
+            <header className="sale-receipt-header"><div><p>{tr("ORDER COMPLETE", "اكتمل الطلب")}</p><h2 id="receipt-preview-title">{tr("Receipt preview", "معاينة الإيصال")}</h2></div><button onClick={startNextOrder} aria-label={tr("Close receipt", "إغلاق الإيصال")}>×</button></header>
+            <div className="sale-receipt-scroll"><ReceiptContent receipt={receipt} money={money} tr={tr}/></div>
+            {lastFailedPrint?.receipt.number === receipt.number && <div className="receipt-print-error" role="alert"><strong>{tr("Order saved — printing failed", "تم حفظ الطلب — فشلت الطباعة")}</strong><span>{lastFailedPrint.message}</span></div>}
+            <div className="sale-receipt-actions"><button onClick={startNextOrder}>{tr("New order", "طلب جديد")}</button><button disabled={printBusy} className="print-kitchen-receipt" onClick={() => { const order = kitchenOrders.find((entry) => entry.number === receipt.number); if (order) void printKitchenReceipt(order); }}>♨ {tr("Kitchen ticket", "تذكرة المطبخ")}</button><button disabled={printBusy} className="print-sale-receipt" onClick={() => void printCurrentReceipt()}>▤ {tr("Reprint receipt", "إعادة طباعة الإيصال")}</button></div>
+          </section>
+        </div>
+      )}
+      {userEditor && (
+        <div
+          className="user-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeUserEditor();
+          }}
+        >
+          <section className="user-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
+            <header className="user-modal-header">
+              <div>
+                <p>{tr(userEditor.mode === "add" ? "NEW STAFF ACCOUNT" : "ACCOUNT SETTINGS", userEditor.mode === "add" ? "حساب موظف جديد" : "إعدادات الحساب")}</p>
+                <h2 id="user-modal-title">{tr(userEditor.mode === "add" ? "Add user" : "Edit user", userEditor.mode === "add" ? "إضافة مستخدم" : "تعديل المستخدم")}</h2>
+              </div>
+              <button type="button" className="user-modal-close" onClick={closeUserEditor} aria-label={tr("Close", "إغلاق")}>×</button>
+            </header>
+            <form className="user-form" onSubmit={submitUser}>
+              <div className="user-modal-scroll">
+                <label className="user-field">
+                  {tr("Full name", "الاسم الكامل")}
+                  <input
+                    autoFocus
+                    autoComplete="off"
+                    value={userForm.name}
+                    onChange={(event) => {
+                      setUserForm((current) => ({ ...current, name: event.target.value }));
+                      setUserFormError("");
+                    }}
+                    placeholder={tr("Example: Jad Daher", "مثال: جاد ضاهر")}
+                  />
+                </label>
+                <div className="user-form-grid">
+                  <label className="user-field">
+                    {tr("Username", "اسم المستخدم")}
+                    <input
+                      autoComplete="off"
+                      dir="ltr"
+                      value={userForm.username}
+                      onChange={(event) => {
+                        setUserForm((current) => ({ ...current, username: event.target.value }));
+                        setUserFormError("");
+                      }}
+                      placeholder="jad"
+                    />
+                  </label>
+                  <label className="user-field">
+                    {tr(userEditor.mode === "add" ? "Password" : "New password (optional)", userEditor.mode === "add" ? "كلمة المرور" : "كلمة مرور جديدة (اختياري)")}
+                    <span className="user-password-field">
+                      <input
+                        autoComplete="new-password"
+                        dir="ltr"
+                        type={showUserPassword ? "text" : "password"}
+                        value={userForm.password}
+                        onChange={(event) => {
+                          setUserForm((current) => ({ ...current, password: event.target.value }));
+                          setUserFormError("");
+                        }}
+                        placeholder={userEditor.mode === "add" ? tr("Minimum 4 characters", "4 أحرف على الأقل") : tr("Leave blank to keep it", "اتركها فارغة للإبقاء عليها")}
+                      />
+                      <button type="button" onClick={() => setShowUserPassword((current) => !current)}>
+                        {showUserPassword ? tr("Hide", "إخفاء") : tr("Show", "إظهار")}
+                      </button>
+                    </span>
+                  </label>
+                </div>
+                <label className="user-field">
+                  {tr("Confirm password", "تأكيد كلمة المرور")}
+                  <input
+                    autoComplete="new-password"
+                    dir="ltr"
+                    type={showUserPassword ? "text" : "password"}
+                    value={userForm.confirmPassword}
+                    onChange={(event) => {
+                      setUserForm((current) => ({ ...current, confirmPassword: event.target.value }));
+                      setUserFormError("");
+                    }}
+                    placeholder={tr("Repeat the password", "أعد كتابة كلمة المرور")}
+                  />
+                </label>
+                <fieldset className="user-role-choice">
+                  <legend>{tr("Access level", "مستوى الصلاحيات")}</legend>
+                  <div className="user-role-options">
+                    {(["cashier", "manager"] as Role[]).map((option) => {
+                      const protectsCurrentAccount = userEditor.mode === "edit"
+                        && userEditor.userId === currentUserId
+                        && option !== currentUser.role;
+                      return (
+                        <button
+                          type="button"
+                          className={userForm.role === option ? "selected" : ""}
+                          disabled={protectsCurrentAccount}
+                          onClick={() => {
+                            setUserForm((current) => ({ ...current, role: option }));
+                            setUserFormError("");
+                          }}
+                          key={option}
+                        >
+                          <strong>{option === "manager" ? tr("Manager", "مدير") : tr("Cashier", "كاشير")}</strong>
+                          <small>{option === "manager" ? tr("Full POS access", "صلاحيات كاملة") : tr("Orders, kitchen, tables & shift", "الطلبات والمطبخ والطاولات والدوام")}</small>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+                <label className={`user-active-toggle ${userEditor.mode === "edit" && userEditor.userId === currentUserId ? "is-locked" : ""}`}>
+                  <input
+                    type="checkbox"
+                    checked={userForm.active}
+                    disabled={userEditor.mode === "edit" && userEditor.userId === currentUserId}
+                    onChange={(event) => setUserForm((current) => ({ ...current, active: event.target.checked }))}
+                  />
+                  <span><strong>{tr("Active account", "حساب مفعّل")}</strong><small>{tr("This user can sign in to the POS.", "يمكن لهذا المستخدم تسجيل الدخول إلى النظام.")}</small></span>
+                </label>
+                {userFormError && <p className="user-form-error" role="alert">{userFormError}</p>}
+              </div>
+              <footer className="user-modal-actions">
+                <button type="button" className="secondary-action" onClick={closeUserEditor}>{tr("Cancel", "إلغاء")}</button>
+                <button type="submit" className="user-save-action">{tr(userEditor.mode === "add" ? "Add user" : "Save changes", userEditor.mode === "add" ? "إضافة المستخدم" : "حفظ التغييرات")}</button>
+              </footer>
+            </form>
+          </section>
+        </div>
+      )}
+      {factoryResetOpen && (
+        <div
+          className="confirm-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setFactoryResetOpen(false);
+          }}
+        >
+          <section className="confirm-dialog factory-reset-dialog" role="alertdialog" aria-modal="true" aria-labelledby="factory-reset-title" aria-describedby="factory-reset-description">
+            <span className="confirm-icon">!</span>
+            <h2 id="factory-reset-title">{tr("Factory reset this POS?", "إعادة ضبط المصنع لهذا الجهاز؟")}</h2>
+            <p id="factory-reset-description">{tr("This permanently clears operational data on this POS device and signs you out.", "سيؤدي هذا إلى حذف بيانات التشغيل نهائياً من هذا الجهاز وتسجيل خروجك.")}</p>
+            <div className="factory-reset-scope">
+              <div><span>×</span><p><strong>{tr("Will be reset", "سيتم حذفه")}</strong>{tr("Users, net sales, average order, recent orders, expenses, inventory, shifts, kitchen tickets, tables and preferences.", "المستخدمون وصافي المبيعات ومعدل الطلب والطلبات الأخيرة والمصاريف والمخزون والدوامات وشاشة المطبخ والطاولات والإعدادات.")}</p></div>
+              <div className="preserved"><span>✓</span><p><strong>{tr("Will be preserved", "سيبقى محفوظاً")}</strong>{tr("All menu items, their prices, photos and every topping.", "جميع أصناف القائمة وأسعارها وصورها وكل الإضافات.")}</p></div>
+            </div>
+            <div className="confirm-actions">
+              <button className="secondary-action" type="button" onClick={() => setFactoryResetOpen(false)}>{tr("Cancel", "إلغاء")}</button>
+              <button className="danger-action" type="button" onClick={performFactoryReset}>{tr("Reset everything else", "حذف كل شيء آخر")}</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {restockTarget && (
+        <div
+          className="menu-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeRestock();
+          }}
+        >
+          <section className="menu-modal-dialog restock-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="restock-modal-title">
+            <header className="menu-modal-header">
+              <div><p>{tr("STOCK RECEIPT", "استلام مخزون")}</p><h2 id="restock-modal-title">{tr(`Restock ${restockTarget.item}`, `زيادة مخزون ${restockTarget.item}`)}</h2></div>
+              <button type="button" className="menu-modal-close" onClick={closeRestock} aria-label={tr("Close", "إغلاق")}>×</button>
+            </header>
+            <form className="menu-modal-form" onSubmit={submitRestock}>
+              <div className="menu-modal-scroll">
+                <div className="restock-current"><span>{tr("Current stock", "المخزون الحالي")}</span><strong>{restockTarget.stock} {restockTarget.unit}</strong></div>
+                <label className="menu-field">
+                  {tr(`Quantity received (${restockTarget.unit})`, `الكمية المستلمة (${restockTarget.unit})`)}
+                  <input autoFocus dir="ltr" inputMode="decimal" value={restockAmount} onChange={(event) => { setRestockAmount(event.target.value.replace(/[^\d.,]/g, "")); setRestockError(""); }} placeholder="0"/>
+                </label>
+                {restockAmount && Number(restockAmount.replace(/,/g, "")) > 0 && <div className="restock-result"><span>{tr("New stock after saving", "المخزون الجديد بعد الحفظ")}</span><strong>{restockTarget.stock + Number(restockAmount.replace(/,/g, ""))} {restockTarget.unit}</strong></div>}
+                {restockError && <p className="menu-form-error" role="alert">{restockError}</p>}
+              </div>
+              <footer className="menu-modal-actions">
+                <button type="button" className="secondary-action" onClick={closeRestock}>{tr("Cancel", "إلغاء")}</button>
+                <button type="submit" className="user-save-action">{tr("Add to stock", "إضافة إلى المخزون")}</button>
+              </footer>
+            </form>
+          </section>
+        </div>
+      )}
+      {inventoryEditor && (
+        <div
+          className="menu-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeInventoryEditor();
+          }}
+        >
+          <section className="menu-modal-dialog inventory-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="inventory-modal-title">
+            <header className="menu-modal-header">
+              <div>
+                <p>{tr("INVENTORY RECORD", "سجل المخزون")}</p>
+                <h2 id="inventory-modal-title">{tr(inventoryEditor.mode === "add" ? "Add inventory item" : "Edit inventory item", inventoryEditor.mode === "add" ? "إضافة صنف مخزون" : "تعديل صنف المخزون")}</h2>
+              </div>
+              <button type="button" className="menu-modal-close" onClick={closeInventoryEditor} aria-label={tr("Close", "إغلاق")}>×</button>
+            </header>
+            <form className="menu-modal-form" onSubmit={submitInventoryItem}>
+              <div className="menu-modal-scroll">
+                <div className="menu-form-grid">
+                  <label className="menu-field wide">
+                    {tr("Item name", "اسم الصنف")}
+                    <input autoFocus autoComplete="off" value={inventoryForm.item} onChange={(event) => { setInventoryForm((current) => ({ ...current, item: event.target.value })); setInventoryFormError(""); }} placeholder={tr("Example: Parmesan cheese", "مثال: جبنة بارميزان")}/>
+                  </label>
+                  <label className="menu-field">
+                    {tr("Category", "الفئة")}
+                    <input autoComplete="off" value={inventoryForm.category} onChange={(event) => { setInventoryForm((current) => ({ ...current, category: event.target.value })); setInventoryFormError(""); }} placeholder={tr("Example: Dairy", "مثال: ألبان")}/>
+                  </label>
+                  <label className="menu-field">
+                    {tr("Measurement unit", "وحدة القياس")}
+                    <select value={inventoryForm.unit} onChange={(event) => setInventoryForm((current) => ({ ...current, unit: event.target.value as InventoryUnit }))}>
+                      <option value="g">{tr("Grams (g)", "غرام (g)")}</option>
+                      <option value="kg">{tr("Kilograms (kg)", "كيلوغرام (kg)")}</option>
+                      <option value="ml">{tr("Milliliters (ml)", "ملليلتر (ml)")}</option>
+                      <option value="L">{tr("Liters (L)", "ليتر (L)")}</option>
+                      <option value="item">{tr("Items / pieces", "حبة / قطعة")}</option>
+                      <option value="box">{tr("Boxes", "علب")}</option>
+                    </select>
+                  </label>
+                  <label className="menu-field">
+                    {tr("Current quantity", "الكمية الحالية")}
+                    <input dir="ltr" inputMode="decimal" value={inventoryForm.stock} onChange={(event) => { setInventoryForm((current) => ({ ...current, stock: event.target.value.replace(/[^\d.,]/g, "") })); setInventoryFormError(""); }} placeholder="0"/>
+                  </label>
+                  <label className="menu-field">
+                    {tr("Low-stock alert at", "تنبيه انخفاض المخزون عند")}
+                    <input dir="ltr" inputMode="decimal" value={inventoryForm.min} onChange={(event) => { setInventoryForm((current) => ({ ...current, min: event.target.value.replace(/[^\d.,]/g, "") })); setInventoryFormError(""); }} placeholder="0"/>
+                  </label>
+                  <label className="menu-field wide">
+                    {tr(`Cost per ${inventoryForm.unit}`, `تكلفة كل ${inventoryForm.unit}`)}
+                    <span className="menu-price-input"><b>{currency}</b><input dir="ltr" inputMode="decimal" value={inventoryForm.cost} onChange={(event) => { setInventoryForm((current) => ({ ...current, cost: event.target.value.replace(/[^\d.,]/g, "") })); setInventoryFormError(""); }} placeholder={currency === "LBP" ? "0" : "0.00"}/></span>
+                  </label>
+                </div>
+                <div className="expense-form-note">ⓘ {tr("The low-stock alert updates immediately after saving.", "يتحدث تنبيه انخفاض المخزون فور الحفظ.")}</div>
+                {inventoryFormError && <p className="menu-form-error" role="alert">{inventoryFormError}</p>}
+              </div>
+              <footer className="menu-modal-actions">
+                <button type="button" className="secondary-action" onClick={closeInventoryEditor}>{tr("Cancel", "إلغاء")}</button>
+                <button type="submit" className="user-save-action">{tr(inventoryEditor.mode === "add" ? "Add item" : "Save changes", inventoryEditor.mode === "add" ? "إضافة الصنف" : "حفظ التغييرات")}</button>
+              </footer>
+            </form>
+          </section>
+        </div>
+      )}
+      {inventoryDeleteConfirmation && (
+        <div
+          className="confirm-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setInventoryDeleteConfirmation(null);
+          }}
+        >
+          <section className="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-inventory-title" aria-describedby="confirm-inventory-description">
+            <span className="confirm-icon">×</span>
+            <h2 id="confirm-inventory-title">{tr(`Delete ${inventoryDeleteConfirmation.item}?`, `حذف ${inventoryDeleteConfirmation.item}؟`)}</h2>
+            <p id="confirm-inventory-description">{tr("This removes the inventory record and its low-stock alert from this POS.", "سيتم حذف سجل المخزون وتنبيه انخفاضه من هذا الجهاز.")}</p>
+            <div className="confirm-actions">
+              <button className="secondary-action" type="button" onClick={() => setInventoryDeleteConfirmation(null)}>{tr("Cancel", "إلغاء")}</button>
+              <button className="danger-action" type="button" onClick={deleteInventoryItem}>{tr("Delete item", "حذف الصنف")}</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {expenseEditor && (
+        <div
+          className="menu-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeExpenseEditor();
+          }}
+        >
+          <section className="menu-modal-dialog expense-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
+            <header className="menu-modal-header">
+              <div>
+                <p>{tr("EXPENSE RECORD", "سجل المصروف")}</p>
+                <h2 id="expense-modal-title">{tr(expenseEditor.mode === "add" ? "Add expense" : "Edit expense", expenseEditor.mode === "add" ? "إضافة مصروف" : "تعديل المصروف")}</h2>
+              </div>
+              <button type="button" className="menu-modal-close" onClick={closeExpenseEditor} aria-label={tr("Close", "إغلاق")}>×</button>
+            </header>
+            <form className="menu-modal-form" onSubmit={submitExpense}>
+              <div className="menu-modal-scroll">
+                <div className="menu-form-grid">
+                  <label className="menu-field wide">
+                    {tr("Description", "الوصف")}
+                    <input autoFocus autoComplete="off" value={expenseForm.item} onChange={(event) => { setExpenseForm((current) => ({ ...current, item: event.target.value })); setExpenseFormError(""); }} placeholder={tr("Example: July electricity bill", "مثال: فاتورة كهرباء شهر تموز")}/>
+                  </label>
+                  <label className="menu-field">
+                    {tr("Category", "الفئة")}
+                    <select value={expenseForm.category} onChange={(event) => setExpenseForm((current) => ({ ...current, category: event.target.value as ExpenseCategory }))}>
+                      {expenseCategories.map((category) => <option value={category} key={category}>{category}</option>)}
+                    </select>
+                  </label>
+                  <label className="menu-field">
+                    {tr("Amount", "المبلغ")}
+                    <span className="menu-price-input"><b>{currency}</b><input dir="ltr" inputMode="decimal" value={expenseForm.amount} onChange={(event) => { setExpenseForm((current) => ({ ...current, amount: event.target.value.replace(/[^\d.,]/g, "") })); setExpenseFormError(""); }} placeholder={currency === "LBP" ? "0" : "0.00"}/></span>
+                  </label>
+                  <label className="menu-field wide">
+                    {tr("Expense date", "تاريخ المصروف")}
+                    <input type="date" value={expenseForm.date} onChange={(event) => { setExpenseForm((current) => ({ ...current, date: event.target.value })); setExpenseFormError(""); }}/>
+                  </label>
+                </div>
+                <div className="expense-form-note">ⓘ {tr(`The amount is entered in ${currency} and reports store its USD value.`, `يُدخل المبلغ بعملة ${currency} وتحفظ التقارير قيمته بالدولار.`)}</div>
+                {expenseFormError && <p className="menu-form-error" role="alert">{expenseFormError}</p>}
+              </div>
+              <footer className="menu-modal-actions">
+                <button type="button" className="secondary-action" onClick={closeExpenseEditor}>{tr("Cancel", "إلغاء")}</button>
+                <button type="submit" className="user-save-action">{tr(expenseEditor.mode === "add" ? "Add expense" : "Save changes", expenseEditor.mode === "add" ? "إضافة المصروف" : "حفظ التغييرات")}</button>
+              </footer>
+            </form>
+          </section>
+        </div>
+      )}
+      {expenseDeleteConfirmation && (
+        <div
+          className="confirm-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setExpenseDeleteConfirmation(null);
+          }}
+        >
+          <section className="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-expense-title" aria-describedby="confirm-expense-description">
+            <span className="confirm-icon">×</span>
+            <h2 id="confirm-expense-title">{tr(`Delete ${expenseDeleteConfirmation.item}?`, `حذف ${expenseDeleteConfirmation.item}؟`)}</h2>
+            <p id="confirm-expense-description">{tr("This removes the expense from this POS and future Excel reports.", "سيتم حذف المصروف من هذا الجهاز ومن تقارير Excel المستقبلية.")}</p>
+            <div className="confirm-actions">
+              <button className="secondary-action" type="button" onClick={() => setExpenseDeleteConfirmation(null)}>{tr("Cancel", "إلغاء")}</button>
+              <button className="danger-action" type="button" onClick={deleteExpense}>{tr("Delete expense", "حذف المصروف")}</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {menuEditor && (
+        <div
+          className="menu-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeMenuEditor();
+          }}
+        >
+          <section className="menu-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="menu-modal-title">
+            <header className="menu-modal-header">
+              <div>
+                <p>{menuEditor.kind === "item" ? tr("MENU ITEM", "صنف من القائمة") : tr("TOPPING", "إضافة")}</p>
+                <h2 id="menu-modal-title">{tr(
+                  menuEditor.mode === "add" ? `Add ${menuEditor.kind === "item" ? "menu item" : "topping"}` : `Edit ${menuEditor.kind === "item" ? "menu item" : "topping"}`,
+                  menuEditor.mode === "add" ? `إضافة ${menuEditor.kind === "item" ? "صنف" : "إضافة"}` : `تعديل ${menuEditor.kind === "item" ? "الصنف" : "الإضافة"}`,
+                )}</h2>
+              </div>
+              <button type="button" className="menu-modal-close" onClick={closeMenuEditor} aria-label={tr("Close", "إغلاق")}>×</button>
+            </header>
+            <form className="menu-modal-form" onSubmit={submitMenuEntry}>
+              <div className="menu-modal-scroll">
+                {menuEditor.kind === "item" ? (
+                  <>
+                    <div className="menu-form-grid">
+                      <label className="menu-field wide">
+                        {tr("Item name", "اسم الصنف")}
+                        <input autoFocus autoComplete="off" value={menuItemForm.name} onChange={(event) => { setMenuItemForm((current) => ({ ...current, name: event.target.value })); setMenuFormError(""); }} placeholder={tr("Example: Sparkling water", "مثال: مياه غازية")}/>
+                      </label>
+                      <label className="menu-field">
+                        {tr("Category", "الفئة")}
+                        <select value={menuItemForm.category} onChange={(event) => { const category = event.target.value as MenuCategory; setMenuItemForm((current) => ({ ...current, category })); setMenuFormError(""); }}>
+                          {menuCategories.map((category) => <option value={category} key={category}>{menuCategoryIcon(category)} {category}</option>)}
+                        </select>
+                      </label>
+                      <label className="menu-field">
+                        {tr("Price", "السعر")}
+                        <span className="menu-price-input"><b>USD</b><input dir="ltr" inputMode="decimal" value={menuItemForm.price} onChange={(event) => { setMenuItemForm((current) => ({ ...current, price: event.target.value.replace(/[^\d.,]/g, "") })); setMenuFormError(""); }} placeholder="0.00"/></span>
+                      </label>
+                      <label className="menu-field wide">
+                        {tr("Description", "الوصف")}
+                        <textarea value={menuItemForm.description} onChange={(event) => setMenuItemForm((current) => ({ ...current, description: event.target.value }))} placeholder={tr("Short description shown to the cashier", "وصف قصير يظهر للكاشير")} maxLength={140}/>
+                      </label>
+                      <label className="menu-field wide">
+                        {tr("Photo URL (optional)", "رابط الصورة (اختياري)")}
+                        <input dir="ltr" inputMode="url" value={menuItemForm.image} onChange={(event) => { setMenuItemForm((current) => ({ ...current, image: event.target.value })); setMenuFormError(""); }} placeholder="https://..."/>
+                      </label>
+                    </div>
+                    <div className="menu-image-preview">
+                      <span aria-hidden="true">{menuCategoryIcon(menuItemForm.category)}</span>
+                      {menuItemForm.image && <img key={menuItemForm.image} src={menuItemForm.image} alt="" onLoad={(event) => { event.currentTarget.style.display = "block"; }} onError={(event) => { event.currentTarget.style.display = "none"; }}/>}
+                      <p><strong>{tr("Photo preview", "معاينة الصورة")}</strong><small>{tr("If left blank, a category icon is shown.", "إذا تركتها فارغة سيظهر رمز الفئة.")}</small></p>
+                    </div>
+                    <label className="menu-active-toggle">
+                      <input type="checkbox" checked={menuItemForm.customizable} onChange={(event) => setMenuItemForm((current) => ({ ...current, customizable: event.target.checked }))}/>
+                      <span><strong>{tr("Ask add-on questions", "اسأل عن الإضافات")}</strong><small>{tr("Cashier chooses available flavors and add-ons with Yes or No.", "يختار الكاشير النكهات والإضافات المتاحة بنعم أو لا.")}</small></span>
+                    </label>
+                    <label className="menu-active-toggle">
+                      <input type="checkbox" checked={menuItemForm.available} onChange={(event) => setMenuItemForm((current) => ({ ...current, available: event.target.checked }))}/>
+                      <span><strong>{tr("Available for sale", "متوفر للبيع")}</strong><small>{tr("Show this item to the cashier in New Order.", "أظهر هذا الصنف للكاشير في الطلب الجديد.")}</small></span>
+                    </label>
+                  </>
+                ) : (
+                  <>
+                    <div className="menu-form-grid">
+                      <label className="menu-field wide">
+                        {tr("Topping name", "اسم الإضافة")}
+                        <input autoFocus autoComplete="off" value={toppingForm.name} onChange={(event) => { setToppingForm((current) => ({ ...current, name: event.target.value })); setMenuFormError(""); }} placeholder={tr("Example: Extra cheese", "مثال: جبنة إضافية")}/>
+                      </label>
+                      <label className="menu-field">
+                        {tr("Icon", "الرمز")}
+                        <input value={toppingForm.emoji} onChange={(event) => setToppingForm((current) => ({ ...current, emoji: event.target.value.slice(0, 8) }))} placeholder="🧀"/>
+                      </label>
+                      <label className="menu-field">
+                        {tr("Extra price", "السعر الإضافي")}
+                        <span className="menu-price-input"><b>USD</b><input dir="ltr" inputMode="decimal" value={toppingForm.price} onChange={(event) => { setToppingForm((current) => ({ ...current, price: event.target.value.replace(/[^\d.,]/g, "") })); setMenuFormError(""); }} placeholder="0.00"/></span>
+                      </label>
+                    </div>
+                    <label className="menu-active-toggle">
+                      <input type="checkbox" checked={toppingForm.available} onChange={(event) => setToppingForm((current) => ({ ...current, available: event.target.checked }))}/>
+                      <span><strong>{tr("Available during customization", "متاحة أثناء التخصيص")}</strong><small>{tr("Cashier will be asked about this topping.", "سيُسأل الكاشير عن هذه الإضافة.")}</small></span>
+                    </label>
+                  </>
+                )}
+                {menuFormError && <p className="menu-form-error" role="alert">{menuFormError}</p>}
+              </div>
+              <footer className="menu-modal-actions">
+                <button type="button" className="secondary-action" onClick={closeMenuEditor}>{tr("Cancel", "إلغاء")}</button>
+                <button type="submit" className="user-save-action">{tr(menuEditor.mode === "add" ? "Add" : "Save changes", menuEditor.mode === "add" ? "إضافة" : "حفظ التغييرات")}</button>
+              </footer>
+            </form>
+          </section>
+        </div>
+      )}
+      {menuDeleteConfirmation && (
+        <div
+          className="confirm-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setMenuDeleteConfirmation(null);
+          }}
+        >
+          <section className="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-menu-title" aria-describedby="confirm-menu-description">
+            <span className="confirm-icon">×</span>
+            <h2 id="confirm-menu-title">{tr(`Delete ${menuDeleteConfirmation.name}?`, `حذف ${menuDeleteConfirmation.name}؟`)}</h2>
+            <p id="confirm-menu-description">{tr(
+              menuDeleteConfirmation.kind === "item"
+                ? "This removes the item from Menu Management and New Order. You can hide it instead if it may return."
+                : "This removes the topping from future customization questions.",
+              menuDeleteConfirmation.kind === "item"
+                ? "سيتم حذف الصنف من إدارة القائمة والطلب الجديد. يمكنك إخفاؤه بدلاً من ذلك إذا كان سيعود لاحقاً."
+                : "سيتم حذف الإضافة من أسئلة التخصيص المستقبلية.",
+            )}</p>
+            <div className="confirm-actions">
+              <button className="secondary-action" type="button" onClick={() => setMenuDeleteConfirmation(null)}>{tr("Cancel", "إلغاء")}</button>
+              <button className="danger-action" type="button" onClick={confirmMenuDelete}>{tr("Delete", "حذف")}</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {userConfirmation && confirmationUser && (
+        <div
+          className="confirm-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setUserConfirmation(null);
+          }}
+        >
+          <section
+            className="confirm-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="confirm-user-title"
+            aria-describedby="confirm-user-description"
+          >
+            <span className="confirm-icon">{userConfirmation.kind === "delete" ? "×" : "!"}</span>
+            <h2 id="confirm-user-title">{tr(
+              userConfirmation.kind === "delete" ? `Delete ${confirmationUser.name}?` : `Deactivate ${confirmationUser.name}?`,
+              userConfirmation.kind === "delete" ? `حذف ${confirmationUser.name}؟` : `تعطيل ${confirmationUser.name}؟`,
+            )}</h2>
+            <p id="confirm-user-description">{tr(
+              userConfirmation.kind === "delete"
+                ? "This removes the account from this POS. The user will no longer be able to sign in."
+                : "The account will stay in the list but the user will not be able to sign in until you activate it again.",
+              userConfirmation.kind === "delete"
+                ? "سيتم حذف الحساب من هذا الجهاز ولن يتمكن المستخدم من تسجيل الدخول."
+                : "سيبقى الحساب في اللائحة، لكن لن يتمكن المستخدم من الدخول حتى تفعّله مجدداً.",
+            )}</p>
+            <div className="confirm-actions">
+              <button className="secondary-action" type="button" onClick={() => setUserConfirmation(null)}>{tr("Cancel", "إلغاء")}</button>
+              <button className="danger-action" type="button" onClick={confirmUserChange}>{tr(userConfirmation.kind === "delete" ? "Delete user" : "Deactivate", userConfirmation.kind === "delete" ? "حذف المستخدم" : "تعطيل")}</button>
+            </div>
+          </section>
+        </div>
+      )}
+      <aside className="sidebar">
+        <button className="side-brand" onClick={() => navigate(role === "manager" ? "dashboard" : "pos")}>
+          <img src="/cocktaillo-logo.png" alt="Cocktaillo Resto Café"/>
+        </button>
+        <div className="nav-label">WORKSPACE</div>
+        <nav>
+          {nav.filter((item) => role === "manager" || !item.manager).map((item) => (
+            <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => navigate(item.id as View)}>
+              <i>{item.icon}</i><span>{language === "ar" ? arabicNav[item.id] : item.label}</span>{item.id === "inventory" && lowStock.length > 0 && <b>{lowStock.length}</b>}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <div className={`shift-state ${shiftOpen ? "open" : ""}`}>
+            <i /> <span>{shiftOpen ? tr("Shift is open", "الدوام مفتوح") : tr("Shift is closed", "الدوام مغلق")}</span>
+          </div>
+          <small>Cocktaillo POS • v1.0</small>
+        </div>
+      </aside>
+
+      <div className="main-area">
+        <header className="system-topbar">
+          <div>
+            <p>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
+            <h1>{title}</h1>
+          </div>
+          <div className="top-actions">
+            <button className="locale-quick" onClick={() => setCurrency((current) => current === "USD" ? "LBP" : "USD")}>{currency}</button>
+            <button className="locale-quick" onClick={() => setLanguage((current) => current === "en" ? "ar" : "en")}>{language === "en" ? "عربي" : "EN"}</button>
+            <button className="theme-quick" onClick={() => setDark((current) => !current)} aria-label="Toggle theme">{dark ? "☀" : "◐"}</button>
+            <div className="profile"><span>{currentUser.initials}</span><div><strong>{currentUser.name}</strong><small>{role}</small></div></div>
+            <button className="logout-button" onClick={logout}>{tr("Log out", "خروج")}</button>
+          </div>
+        </header>
+
+        <main className="content-area">
+          {view === "dashboard" && role === "manager" && (
+            <>
+              <div className="welcome-row">
+                <div><p className="page-kicker">LIVE OVERVIEW</p><h2>{tr(`Good evening, ${currentUser.name.split(" ")[0]}.`, `مساء الخير، ${currentUser.name.split(" ")[0]}.`)}</h2><p>Here&apos;s what&apos;s happening at Cocktaillo today.</p></div>
+                <button className="primary-button" onClick={() => navigate("reports")}>View full report →</button>
+              </div>
+              <div className="metric-grid">
+                <Metric label={tr("Net sales", "صافي المبيعات")} value={money(salesTotal)} trend={tr("Recorded on this POS", "مسجلة على هذا الجهاز")} icon="$" />
+                <Metric label={tr("Orders", "الطلبات")} value={String(orders)} trend={tr("Completed orders", "طلبات مكتملة")} icon="#" />
+                <Metric label={tr("Avg. order", "معدل الطلب")} value={money(orders > 0 ? salesTotal / orders : 0)} trend={tr("Sales ÷ orders", "المبيعات ÷ الطلبات")} icon="↗" />
+                <Metric label="Available tables" value={`${availableTables} / 12`} trend="Floor status" icon="▦" />
+              </div>
+              <div className="dashboard-grid">
+                <section className="panel sales-panel">
+                  <PanelHead title="Sales today" caption="Hourly performance" action="Live" />
+                  {salesTotal > 0 ? <>
+                    <div className="chart-bars">
+                      {[22, 34, 27, 45, 54, 48, 72, 64, 82, 68, 91, 76].map((height, index) => <i key={index} style={{ height: `${height}%` }}><span /></i>)}
+                    </div>
+                    <div className="chart-labels"><span>10am</span><span>1pm</span><span>4pm</span><span>7pm</span><span>10pm</span></div>
+                  </> : <div className="sales-chart-empty"><span>$</span><strong>{tr("No sales recorded", "لا توجد مبيعات مسجلة")}</strong><small>{tr("Completed orders will build today's chart.", "ستظهر الطلبات المكتملة في الرسم البياني.")}</small></div>}
+                </section>
+                <section className="panel alert-panel">
+                  <PanelHead title="Inventory alerts" caption={`${lowStock.length} items need attention`} action="View all" onAction={() => navigate("inventory")} />
+                  {lowStock.map((item) => <div className="alert-line" key={item.id}><span className="alert-icon">!</span><div><strong>{item.item}</strong><small>{item.stock} {item.unit} left • Min {item.min}</small></div><b>Low</b></div>)}
+                </section>
+              </div>
+              <section className="panel">
+                <PanelHead title={tr("Recent orders", "الطلبات الأخيرة")} caption={tr("Latest activity across the restaurant", "آخر النشاطات في المطعم")} action={tr("Today", "اليوم")} />
+                <div className="order-table table-head"><span>Order</span><span>Type</span><span>Cashier</span><span>Time</span><span>Status</span><span>Total</span></div>
+                {recentOrders.map((order) => <div className="order-table" key={order.number}><span>{order.number}</span><span>{order.type}</span><span>{order.cashier}</span><span>{order.time}</span><span className={`order-status ${order.status.toLowerCase()}`}>{order.status}</span><span>{money(order.total)}</span></div>)}
+                {!recentOrders.length && <div className="recent-orders-empty"><span>#</span><strong>{tr("No recent orders", "لا توجد طلبات حديثة")}</strong><small>{tr("New completed orders will appear here.", "ستظهر الطلبات الجديدة المكتملة هنا.")}</small></div>}
+              </section>
+            </>
+          )}
+
+          {view === "pos" && (
+            <section>
+              <div className="welcome-row compact">
+                <div><p className="page-kicker">ORDER #{nextOrderNumber}</p><h2>{selectedMenuItem ? tr("Customize item", "تخصيص الصنف") : tr("New counter order", "طلب جديد")}</h2><p>{shiftOpen ? tr("Choose the service type, then build the order.", "اختر نوع الطلب ثم حضّر الطلب.") : tr("Your shift must be open before taking orders.", "يجب فتح الدوام قبل أخذ الطلبات.")}</p></div>
+                <button className={`shift-button ${shiftOpen ? "danger" : ""}`} onClick={() => navigate("shift")}>{shiftOpen ? "Shift open" : "Open shift"}</button>
+              </div>
+              {!selectedMenuItem ? <>
+                <section className="order-service-panel">
+                  <div className="order-step-copy"><span>1</span><div><p>{tr("STEP 1", "الخطوة ١")}</p><h3>{tr("How will they receive the order?", "كيف سيستلم الزبون الطلب؟")}</h3></div></div>
+                  <div className="order-service-options">
+                    <button disabled={!shiftOpen} className={counterOrderType === "Dine-in" ? "active" : ""} onClick={() => { setCounterOrderType("Dine-in"); setCounterTable(null); setOrderContact({ name: "", phone: "", address: "", driver: "" }); }}><i>▦</i><span><strong>{tr("Dine-in", "داخل المطعم")}</strong><small>{tr("Serve at a numbered table", "تقديم على طاولة")}</small></span><b>✓</b></button>
+                    <button disabled={!shiftOpen} className={counterOrderType === "Takeaway" ? "active" : ""} onClick={() => { setCounterOrderType("Takeaway"); setCounterTable(null); setOrderContact((current) => ({ ...current, address: "", driver: "" })); }}><i>▢</i><span><strong>{tr("Takeaway / Online", "سفري / أونلاين")}</strong><small>{tr("One pickup flow", "مسار استلام واحد")}</small></span><b>✓</b></button>
+                    <button disabled={!shiftOpen} className={counterOrderType === "Delivery" ? "active" : ""} onClick={() => { setCounterOrderType("Delivery"); setCounterTable(null); }}><i>⌁</i><span><strong>{tr("Delivery", "توصيل")}</strong><small>{tr("Address and driver receipt", "عنوان وإيصال للسائق")}</small></span><b>✓</b></button>
+                  </div>
+                  {counterOrderType === "Dine-in" && (
+                    <div className="counter-table-picker">
+                      <div><strong>{tr("Choose table number", "اختر رقم الطاولة")}</strong><small>{tr("Occupied tables cannot receive a new order.", "لا يمكن إضافة طلب جديد إلى طاولة مشغولة.")}</small></div>
+                      <div>{tables.map((table) => <button key={table.number} disabled={table.status === "occupied"} className={`${counterTable === table.number ? "selected" : ""} ${table.status}`} onClick={() => setCounterTable(table.number)}><b>{table.number}</b><small>{table.status}</small></button>)}</div>
+                    </div>
+                  )}
+                  {(counterOrderType === "Takeaway" || counterOrderType === "Delivery") && (
+                    <div className="order-contact-panel">
+                      <div className="order-contact-heading">
+                        <div><strong>{counterOrderType === "Delivery" ? tr("Delivery details", "معلومات التوصيل") : tr("Takeaway / online pickup details", "معلومات السفري / الاستلام أونلاين")}</strong><small>{counterOrderType === "Delivery" ? tr("These details print on the driver receipt.", "تُطبع هذه المعلومات على إيصال السائق.") : tr("Takeaway and online pickup now use this same flow.", "السفري والاستلام أونلاين أصبحا في نفس المسار.")}</small></div>
+                        <span className={counterServiceReady ? "ready" : ""}>{counterServiceReady ? tr("Ready", "جاهز") : tr("Required", "مطلوب")}</span>
+                      </div>
+                      <div className="order-contact-grid">
+                        <label>{tr("Customer name", "اسم الزبون")} *<input autoComplete="name" value={orderContact.name} onChange={(event) => setOrderContact((current) => ({ ...current, name: event.target.value }))} placeholder={tr("Full name", "الاسم الكامل")}/></label>
+                        <label>{tr("Phone number", "رقم الهاتف")} *<input autoComplete="tel" inputMode="tel" value={orderContact.phone} onChange={(event) => setOrderContact((current) => ({ ...current, phone: event.target.value }))} placeholder="+961"/></label>
+                        {counterOrderType === "Delivery" && <label className="wide">{tr("Delivery address", "عنوان التوصيل")} *<textarea value={orderContact.address} onChange={(event) => setOrderContact((current) => ({ ...current, address: event.target.value }))} placeholder={tr("Area, street, building, floor", "المنطقة، الشارع، المبنى، الطابق")}/></label>}
+                        {counterOrderType === "Delivery" && <label className="wide">{tr("Driver name", "اسم السائق")} <small>{tr("(optional)", "(اختياري)")}</small><input value={orderContact.driver} onChange={(event) => setOrderContact((current) => ({ ...current, driver: event.target.value }))} placeholder={tr("Assign now or later", "عيّنه الآن أو لاحقاً")}/></label>}
+                      </div>
+                    </div>
+                  )}
+                  <div className="payment-panel">
+                    <div><strong>{tr("Payment method", "طريقة الدفع")}</strong><small>{tr("The drawer opens for cash payments by default.", "يفتح الدرج للدفع النقدي تلقائياً.")}</small></div>
+                    <div className="payment-options">
+                      {(["Cash", "Card", "Online"] as PaymentMethod[]).map((method) => <button type="button" className={paymentMethod === method ? "active" : ""} onClick={() => { setPaymentMethod(method); if (method !== "Cash") setCashReceivedInput(""); }} key={method}>{method === "Cash" ? "▣" : method === "Card" ? "▰" : "◎"} {tr(method, method === "Cash" ? "نقداً" : method === "Card" ? "بطاقة" : "أونلاين")}</button>)}
+                    </div>
+                    {paymentMethod === "Cash" && <label>{tr("Cash received", "المبلغ المستلم")} <small>{tr("(leave blank for exact amount)", "(اتركه فارغاً للمبلغ المحدد)")}</small><input type="number" min="0" step="0.01" inputMode="decimal" value={cashReceivedInput} onChange={(event) => setCashReceivedInput(event.target.value)} placeholder={tr("Exact amount", "المبلغ المحدد")}/></label>}
+                  </div>
+                </section>
+                <section className={`menu-step ${counterServiceReady ? "" : "locked"}`}>
+                  <div className="order-step-copy"><span>2</span><div><p>{tr("STEP 2", "الخطوة ٢")}</p><h3>{tr("Choose a menu item", "اختر صنفاً من القائمة")}</h3></div></div>
+                  <div className="pos-category-filter" role="tablist" aria-label={tr("Menu categories", "فئات القائمة")}>
+                    {(["All", ...menuCategories] as const).map((category) => (
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={posMenuFilter === category}
+                        className={`pos-category-button ${posMenuFilter === category ? "active" : ""}`}
+                        onClick={() => setPosMenuFilter(category)}
+                        key={category}
+                      >
+                        <span>{category === "All" ? "☷" : menuCategoryIcon(category)}</span>
+                        {category === "All" ? tr("All", "الكل") : category}
+                      </button>
+                    ))}
+                  </div>
+                  {visibleMenuItems.length ? (
+                    <div className="pos-grid">
+                      {visibleMenuItems.map((item) => (
+                        <button disabled={!counterServiceReady} className="pos-dish" key={item.id} onClick={() => beginMenuItem(item)}>
+                          <span className="pos-dish-media">
+                            <span className="pos-dish-placeholder" aria-hidden="true">{menuCategoryIcon(item.category)}</span>
+                            {item.image && <img src={item.image} alt={item.name} onLoad={(event) => { event.currentTarget.style.display = "block"; }} onError={(event) => { event.currentTarget.style.display = "none"; }}/>}
+                            <em className="pos-dish-category">{item.category}</em>
+                          </span>
+                          <span className="pos-dish-details"><span><strong>{item.name}</strong><small>{item.description || tr("Freshly made to order", "تحضير طازج حسب الطلب")}</small></span><b>{money(item.price)}</b></span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="pos-empty-state"><span>☷</span><strong>{tr("No available items in this category", "لا توجد أصناف متاحة في هذه الفئة")}</strong><small>{tr("A manager can add or show items from Menu Management.", "يمكن للمدير إضافة الأصناف أو إظهارها من إدارة القائمة.")}</small></div>
+                  )}
+                </section>
+              </> :
+                <div className="customizer">
+                  <aside>
+                    <span className="pos-dish-media customizer-media">
+                      <span className="pos-dish-placeholder" aria-hidden="true">{menuCategoryIcon(selectedMenuItem.category)}</span>
+                      {selectedMenuItem.image && <img src={selectedMenuItem.image} alt={selectedMenuItem.name} onLoad={(event) => { event.currentTarget.style.display = "block"; }} onError={(event) => { event.currentTarget.style.display = "none"; }}/>}
+                    </span>
+                    <span className="counter-order-context">{counterOrderType === "Dine-in" ? `${tr("Dine-in", "داخل المطعم")} · ${tr("Table", "طاولة")} ${counterTable}` : `${counterOrderType === "Delivery" ? tr("Delivery", "توصيل") : tr("Takeaway / Online", "سفري / أونلاين")} · ${contactName}`}</span>
+                    <p>{tr("Your item", "الصنف المختار")}</p><h3>{selectedMenuItem.name}</h3><strong>{money(selectedTotal)}</strong>
+                    <button onClick={() => { setSelectedMenuItem(null); setSelectedToppingIds([]); setOrderToppings([]); setToppingStep(0); }}>{tr("Change item", "تغيير الصنف")}</button>
+                  </aside>
+                  {currentTopping ? (
+                    <div className="topping-question">
+                      <p className="page-kicker">{tr("QUESTION", "السؤال")} {toppingStep + 1} {tr("OF", "من")} {orderToppings.length}</p>
+                      <div className="food-emoji">{currentTopping.emoji}</div>
+                      <h2>{tr("Would you like", "هل ترغب بإضافة")}<br/><em>{currentTopping.name}?</em></h2>
+                      <p>{currentTopping.price > 0 ? `+${money(currentTopping.price)} · ${tr("optional add-on", "إضافة اختيارية")}` : tr("Included in the item price", "مشمول بسعر الصنف")}</p>
+                      <div><button className="no-answer" onClick={() => answerTopping(false)}>× <span>{tr("No", "لا")}<small>{tr("Skip this", "تخطي")}</small></span></button><button className="yes-answer" onClick={() => answerTopping(true)}>✓ <span>{tr("Yes", "نعم")}<small>{tr("Add it", "إضافة")}</small></span></button></div>
+                    </div>
+                  ) : (
+                    <div className="topping-question"><div className="food-emoji">✓</div><h2>{tr("Item ready", "الصنف جاهز")}</h2><p>{tr("No available toppings to ask about.", "لا توجد إضافات متاحة حالياً.")}</p><div><button className="yes-answer" onClick={() => completeOrder(selectedMenuItem, orderToppings.filter((topping) => selectedToppingIds.includes(topping.id)))}>✓ <span>{tr("Complete order", "إكمال الطلب")}</span></button></div></div>
+                  )}
+                </div>}
+            </section>
+          )}
+
+          {view === "kitchen" && (
+            <section className="kitchen-page">
+              <div className="welcome-row compact"><div><p className="page-kicker">KITCHEN DISPLAY</p><h2>Live orders</h2><p>Tap an order when preparation is complete.</p></div><div className="kitchen-counts"><span><b>{kitchenOrders.filter((order) => order.status === "pending").length}</b> Pending</span><span><b>{kitchenOrders.filter((order) => order.status === "done").length}</b> Done</span></div></div>
+              <div className="kitchen-columns">
+                <div><h3><i className="pending-dot"/>Pending</h3><div className="kitchen-grid">{kitchenOrders.filter((order) => order.status === "pending").map((order) => <article className="kitchen-ticket pending" key={order.id}><header><span><strong>{order.number}</strong><small>{order.type}</small></span><b>{order.time}</b></header>{order.customer && <p>{order.customer}</p>}<ul>{order.items.map((item) => <li key={item}>{item}</li>)}</ul><div className="kitchen-ticket-actions"><button className="print-ticket" onClick={() => printKitchenReceipt(order)}>▤ Print ticket</button><button onClick={() => toggleKitchenOrder(order.id)}>✓ Mark as done</button></div></article>)}</div></div>
+                <div><h3><i className="done-dot"/>Done</h3><div className="kitchen-grid">{kitchenOrders.filter((order) => order.status === "done").map((order) => <article className="kitchen-ticket done" key={order.id}><header><span><strong>{order.number}</strong><small>{order.type}</small></span><b>Done</b></header>{order.customer && <p>{order.customer}</p>}<ul>{order.items.map((item) => <li key={item}>{item}</li>)}</ul><div className="kitchen-ticket-actions"><button className="print-ticket" onClick={() => printKitchenReceipt(order)}>▤ Reprint ticket</button><button onClick={() => toggleKitchenOrder(order.id)}>↶ Return to pending</button></div></article>)}</div></div>
+              </div>
+            </section>
+          )}
+
+          {view === "tables" && (
+            <section>
+              <div className="welcome-row compact"><div><p className="page-kicker">DINING ROOM</p><h2>Table management</h2><p>Tap a table to move between available, occupied and reserved.</p></div><div className="legend"><span><i className="available"/>Available</span><span><i className="occupied"/>Occupied</span><span><i className="reserved"/>Reserved</span></div></div>
+              <div className="table-grid">{tables.map((table) => <button className={`restaurant-table ${table.status}`} key={table.number} onClick={() => updateTable(table.number)}><span className="table-number">{table.number}</span><small>Table</small><strong>{table.status}</strong><div><span>♙ {table.seats}</span>{table.order && <span>{table.order}</span>}</div>{table.total && <b>${table.total.toFixed(2)}</b>}</button>)}</div>
+            </section>
+          )}
+
+          {view === "shift" && (
+            <section className="narrow-page">
+              <div className="shift-hero"><span className={shiftOpen ? "open" : ""}>◷</span><p className="page-kicker">CURRENT REGISTER</p><h2>{shiftOpen ? tr("Shift in progress", "الدوام مفتوح") : tr("Ready to start?", "جاهز للبدء؟")}</h2><p>{shiftOpen ? tr(`Opened today at ${shiftStartedAt} by ${shiftOpenedBy}`, `فُتح اليوم الساعة ${shiftStartedAt} بواسطة ${shiftOpenedBy}`) : tr(`Signed in as ${currentUser.name}. Enter the exact cash currently in the drawer.`, `تم الدخول باسم ${currentUser.name}. أدخل المبلغ الموجود حالياً في الصندوق.`)}</p></div>
+              <div className="shift-stats"><div><span>Opening cash</span><strong>{shiftOpen && openingCash !== null ? money(openingCash) : "—"}</strong></div><div><span>Cash sales</span><strong>{shiftOpen ? money(426.5) : "—"}</strong></div><div><span>Card sales</span><strong>{shiftOpen ? money(858) : "—"}</strong></div><div><span>Orders</span><strong>{shiftOpen ? orders : "—"}</strong></div></div>
+              {!shiftOpen ? (
+                <form className="shift-open-form" onSubmit={(event) => { event.preventDefault(); toggleShift(); }}>
+                  <label>
+                    <span>{tr("Opening cash amount", "المبلغ الافتتاحي")}</span>
+                    <small>{tr(`Enter the amount in ${currency}. It is never filled automatically.`, `أدخل المبلغ بعملة ${currency}. لا تتم تعبئته تلقائياً.`)}</small>
+                    <div className="shift-cash-input">
+                      <b>{currency}</b>
+                      <input
+                        aria-label={tr("Opening cash amount", "المبلغ الافتتاحي")}
+                        autoComplete="off"
+                        dir="ltr"
+                        inputMode="decimal"
+                        value={openingCashInput}
+                        onChange={(event) => setOpeningCashInput(event.target.value.replace(/[^\d.,]/g, ""))}
+                        placeholder={currency === "LBP" ? "0" : "0.00"}
+                      />
+                    </div>
+                  </label>
+                  <button className="shift-open-submit" type="submit" disabled={!openingCashInput.trim()}>
+                    {tr("Open shift", "فتح الدوام")} <span>→</span>
+                  </button>
+                </form>
+              ) : (
+                <button className="big-shift-button close" onClick={toggleShift}>{tr("Close shift & count cash", "إغلاق الدوام وعدّ الصندوق")}</button>
+              )}
+            </section>
+          )}
+
+          {view === "inventory" && role === "manager" && (
+            <section className="inventory-page">
+              <div className="welcome-row compact"><div><p className="page-kicker">{tr("STOCK CONTROL", "إدارة المخزون")}</p><h2>{tr("Inventory", "المخزون")}</h2><p>{tr("Add, edit and delete stock tracked by grams, kilograms, liters, pieces or boxes.", "أضف وعدّل واحذف المخزون المقاس بالغرام أو الكيلوغرام أو الليتر أو القطعة أو العلبة.")}</p></div><button className="primary-button" onClick={openAddInventoryItem}>+ {tr("Add inventory item", "إضافة صنف مخزون")}</button></div>
+              <div className="user-storage-note"><span>⌂</span><p><strong>{tr("Saved on this POS device", "محفوظ على جهاز نقطة البيع هذا")}</strong>{tr("Quantities, costs and low-stock alerts update immediately after every change.", "تتحدث الكميات والتكاليف وتنبيهات انخفاض المخزون فور كل تعديل.")}</p></div>
+              <div className="unit-guide"><span><b>g / kg</b>Weight</span><span><b>ml / L</b>Volume</span><span><b>item</b>Individual pieces</span><span><b>box</b>Packaged stock</span></div>
+              <div className="inventory-summary"><span><b>{inventory.length}</b>Total items</span><span className="warning"><b>{lowStock.length}</b>Low stock alerts</span><span><b>{money(inventory.reduce((sum, item) => sum + item.stock * item.cost, 0))}</b>Stock value</span></div>
+              <section className="panel data-panel">
+                <div className="inventory-table table-head"><span>{tr("Item", "الصنف")}</span><span>{tr("Category", "الفئة")}</span><span>{tr("In stock", "الكمية")}</span><span>{tr("Alert at", "التنبيه عند")}</span><span>{tr("Status", "الحالة")}</span><span>{tr("Actions", "إجراءات")}</span></div>
+                {inventory.map((item) => <div className="inventory-table" key={item.id}><span><strong>{item.item}</strong><small>{money(item.cost)} / {item.unit}</small></span><span>{item.category}</span><span>{item.stock} {item.unit}</span><span>{item.min} {item.unit}</span><span><b className={item.stock <= item.min ? "low-pill" : "good-pill"}>{item.stock <= item.min ? tr("Low stock", "مخزون منخفض") : tr("In stock", "متوفر")}</b></span><span className="inventory-row-actions"><button type="button" className="restock" onClick={() => openRestock(item)}>+ {tr("Restock", "زيادة")}</button><button type="button" onClick={() => openEditInventoryItem(item)}>✎ {tr("Edit", "تعديل")}</button><button type="button" className="delete" onClick={() => setInventoryDeleteConfirmation(item)}>× {tr("Delete", "حذف")}</button></span></div>)}
+                {!inventory.length && <div className="inventory-empty"><span>□</span><strong>{tr("No inventory items", "لا توجد أصناف مخزون")}</strong><small>{tr("Use Add inventory item to create the first record.", "استخدم إضافة صنف مخزون لإنشاء أول سجل.")}</small></div>}
+              </section>
+            </section>
+          )}
+
+          {view === "menu" && role === "manager" && (
+            <section className="menu-page">
+              <div className="welcome-row compact menu-heading">
+                <div><p className="page-kicker">{tr("CATALOG CONTROL", "إدارة القائمة")}</p><h2>{tr("Menu management", "إدارة قائمة الطعام")}</h2><p>{tr("Add beverages and dishes, edit toppings and pricing, or hide anything that is unavailable.", "أضف المشروبات والأطباق وعدّل الإضافات والأسعار أو أخفِ أي صنف غير متوفر.")}</p></div>
+                <button className="primary-button" onClick={() => openAddMenuEntry(menuTab === "items" ? "item" : "topping")}>+ {menuTab === "items" ? tr("Add menu item", "إضافة صنف") : tr("Add topping", "إضافة إضافة")}</button>
+              </div>
+              <div className="user-storage-note menu-storage-note"><span>⌂</span><p><strong>{tr("Saved on this POS device", "محفوظ على جهاز نقطة البيع هذا")}</strong>{tr("Changes appear immediately in New Order on this same device.", "تظهر التعديلات فوراً في شاشة الطلب الجديد على هذا الجهاز.")}</p></div>
+              <div className="menu-tabs" role="tablist" aria-label={tr("Menu management sections", "أقسام إدارة القائمة")}>
+                <button type="button" role="tab" aria-selected={menuTab === "items"} className={`menu-tab ${menuTab === "items" ? "active" : ""}`} onClick={() => setMenuTab("items")}><span>☷</span><strong>{tr("Menu items", "أصناف القائمة")}</strong><b>{menuItems.length}</b></button>
+                <button type="button" role="tab" aria-selected={menuTab === "toppings"} className={`menu-tab ${menuTab === "toppings" ? "active" : ""}`} onClick={() => setMenuTab("toppings")}><span>✦</span><strong>{tr("Toppings", "الإضافات")}</strong><b>{toppings.length}</b></button>
+              </div>
+              {menuTab === "items" ? (
+                menuItems.length ? (
+                  <div className="menu-management-grid">
+                    {menuItems.map((item) => (
+                      <article className={`menu-card ${item.available ? "" : "is-unavailable"}`} key={item.id}>
+                        <div className="menu-card-media">
+                          <span aria-hidden="true">{menuCategoryIcon(item.category)}</span>
+                          {item.image && <img src={item.image} alt={item.name} onLoad={(event) => { event.currentTarget.style.display = "block"; }} onError={(event) => { event.currentTarget.style.display = "none"; }}/>}
+                          <b>{item.category}</b>
+                        </div>
+                        <div className="menu-card-copy">
+                          <div className="menu-card-top"><div><h3>{item.name}</h3><p>{item.description || tr("No description", "لا يوجد وصف")}</p></div><strong className="menu-card-price">{money(item.price)}</strong></div>
+                          <div className="menu-card-status"><span className={item.available ? "available" : "hidden"}>● {item.available ? tr("Available", "متوفر") : tr("Hidden from cashier", "مخفي عن الكاشير")}</span><small>{item.customizable ? tr("Uses topping questions", "مع خيارات الإضافات") : tr("Quick add — no toppings", "إضافة سريعة بلا إضافات")}</small></div>
+                          <div className="menu-card-actions">
+                            <button type="button" className="menu-action edit" onClick={() => openEditMenuItem(item)}>✎ {tr("Edit", "تعديل")}</button>
+                            <button type="button" className="menu-action availability" onClick={() => toggleMenuEntry("item", item.id)}>{item.available ? "◷" : "✓"} {item.available ? tr("Hide", "إخفاء") : tr("Show", "إظهار")}</button>
+                            <button type="button" className="menu-action delete" onClick={() => setMenuDeleteConfirmation({ kind: "item", id: item.id, name: item.name })}>× {tr("Delete", "حذف")}</button>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="menu-empty"><span>☷</span><h3>{tr("No menu items yet", "لا توجد أصناف بعد")}</h3><p>{tr("Add food, hookah, cocktails, drinks, desserts or any other item.", "أضف الطعام والأرجيلة والكوكتيلات والمشروبات والحلويات أو أي صنف آخر.")}</p><button className="primary-button" onClick={() => openAddMenuEntry("item")}>+ {tr("Add first item", "إضافة أول صنف")}</button></div>
+                )
+              ) : (
+                toppings.length ? (
+                  <div className="menu-management-grid">
+                    {toppings.map((topping) => (
+                      <article className={`menu-card is-topping ${topping.available ? "" : "is-unavailable"}`} key={topping.id}>
+                        <span className="menu-topping-icon" aria-hidden="true">{topping.emoji}</span>
+                        <div className="menu-card-copy">
+                          <div className="menu-card-top"><div><h3>{topping.name}</h3><p>{tr("Optional order add-on", "إضافة اختيارية للطلب")}</p></div><strong className="menu-card-price">+ {money(topping.price)}</strong></div>
+                          <div className="menu-card-status"><span className={topping.available ? "available" : "hidden"}>● {topping.available ? tr("Asked during customization", "تظهر أثناء التخصيص") : tr("Hidden from cashier", "مخفية عن الكاشير")}</span></div>
+                          <div className="menu-card-actions">
+                            <button type="button" className="menu-action edit" onClick={() => openEditTopping(topping)}>✎ {tr("Edit", "تعديل")}</button>
+                            <button type="button" className="menu-action availability" onClick={() => toggleMenuEntry("topping", topping.id)}>{topping.available ? "◷" : "✓"} {topping.available ? tr("Hide", "إخفاء") : tr("Show", "إظهار")}</button>
+                            <button type="button" className="menu-action delete" onClick={() => setMenuDeleteConfirmation({ kind: "topping", id: topping.id, name: topping.name })}>× {tr("Delete", "حذف")}</button>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="menu-empty"><span>✦</span><h3>{tr("No toppings yet", "لا توجد إضافات بعد")}</h3><p>{tr("Add the optional extras the cashier should ask about.", "أضف الخيارات الإضافية التي يسأل عنها الكاشير.")}</p><button className="primary-button" onClick={() => openAddMenuEntry("topping")}>+ {tr("Add first topping", "إضافة أول خيار")}</button></div>
+                )
+              )}
+            </section>
+          )}
+
+          {view === "expenses" && role === "manager" && (
+            <section className="expenses-page">
+              <div className="welcome-row compact"><div><p className="page-kicker">{tr("COST TRACKING", "تتبع المصاريف")}</p><h2>{tr("Expenses", "المصاريف")}</h2><p>{tr("Add, edit and delete electricity, salaries, internet, rent, supplies and other costs.", "أضف وعدّل واحذف تكاليف الكهرباء والرواتب والإنترنت والإيجار واللوازم وغيرها.")}</p></div><button className="primary-button" onClick={openAddExpense}>+ {tr("Add expense", "إضافة مصروف")}</button></div>
+              <div className="user-storage-note"><span>⌂</span><p><strong>{tr("Saved on this POS device", "محفوظ على جهاز نقطة البيع هذا")}</strong>{tr("Every change is included automatically in future Excel reports.", "كل تعديل يُضاف تلقائياً إلى تقارير Excel المستقبلية.")}</p></div>
+              <div className="expense-categories">{["⚡ Electricity","♙ Salary","⌁ Internet","⌂ Rent","□ Supplies","••• Other"].map((category) => <span key={category}>{category}</span>)}</div>
+              <div className="metric-grid three"><Metric label={tr("Today", "اليوم")} value={money(todayExpenses.reduce((sum, expense) => sum + expense.amount, 0))} trend={`${todayExpenses.length} ${tr("entries", "قيود")}`} icon="↘"/><Metric label={tr("This month", "هذا الشهر")} value={money(monthExpenses.reduce((sum, expense) => sum + expense.amount, 0))} trend={`${monthExpenses.length} ${tr("recorded expenses", "مصاريف مسجلة")}`} icon="$"/><Metric label={tr("Top category", "أعلى فئة")} value={topExpenseCategory} trend={tr("Largest operating cost", "أكبر تكلفة تشغيلية")} icon="□"/></div>
+              <section className="panel data-panel"><PanelHead title={tr("Recent expenses", "المصاريف الأخيرة")} caption={tr("All recorded operating costs", "جميع تكاليف التشغيل المسجلة")} action={tr("Export Excel", "تصدير Excel")} onAction={exportExcel}/>
+                <div className="expense-table table-head"><span>{tr("Description", "الوصف")}</span><span>{tr("Category", "الفئة")}</span><span>{tr("Date", "التاريخ")}</span><span>{tr("Added by", "أضيف بواسطة")}</span><span>{tr("Amount", "المبلغ")}</span><span>{tr("Actions", "إجراءات")}</span></div>
+                {expenses.map((expense) => <div className="expense-table" key={expense.id}><span><strong>{expense.item}</strong></span><span>{expense.category}</span><span>{formatExpenseDate(expense.date)}</span><span>{expense.addedBy}</span><span><strong>{money(expense.amount)}</strong></span><span className="expense-row-actions"><button type="button" onClick={() => openEditExpense(expense)}>✎ {tr("Edit", "تعديل")}</button><button type="button" className="delete" onClick={() => setExpenseDeleteConfirmation(expense)}>× {tr("Delete", "حذف")}</button></span></div>)}
+                {!expenses.length && <div className="expense-empty"><span>↘</span><strong>{tr("No expenses recorded", "لا توجد مصاريف مسجلة")}</strong><small>{tr("Use Add expense to create the first record.", "استخدم إضافة مصروف لإنشاء أول سجل.")}</small></div>}
+              </section>
+            </section>
+          )}
+
+          {view === "users" && role === "manager" && (
+            <section className="users-page">
+              <div className="welcome-row compact"><div><p className="page-kicker">{tr("ADMIN CONTROL CENTER", "مركز تحكم الإدارة")}</p><h2>{tr("Admin dashboard", "لوحة الإدارة")}</h2><p>{tr("Manage staff access, reset passwords, change roles and disable accounts from one place.", "أدر صلاحيات الموظفين وغيّر كلمات السر والأدوار وعطّل الحسابات من مكان واحد.")}</p></div><button className="primary-button" onClick={openAddUser}>+ {tr("Add user", "إضافة مستخدم")}</button></div>
+              <div className="metric-grid">
+                <Metric label={tr("Total users", "كل المستخدمين")} value={String(accounts.length)} trend={tr("Registered on this POS", "مسجّلون على هذا الجهاز")} icon="♙"/>
+                <Metric label={tr("Managers", "المدراء")} value={String(accounts.filter((account) => account.role === "manager").length)} trend={tr("Full admin access", "صلاحيات إدارة كاملة")} icon="◆"/>
+                <Metric label={tr("Cashiers", "الكاشير")} value={String(accounts.filter((account) => account.role === "cashier").length)} trend={tr("POS access", "صلاحية نقطة البيع")} icon="▣"/>
+                <Metric label={tr("Disabled", "المعطّلون")} value={String(accounts.filter((account) => !account.active).length)} trend={tr("Cannot sign in", "لا يمكنهم تسجيل الدخول")} icon="×"/>
+              </div>
+              <div className="permission-note"><span>🔒</span><div><strong>{tr("Password recovery is available here", "استعادة كلمات السر متاحة هنا")}</strong><p>{tr("Open a user menu, choose Edit user, enter a new password and save. Cashiers cannot open this admin dashboard.", "افتح قائمة المستخدم واختر تعديل المستخدم، ثم أدخل كلمة سر جديدة واحفظ. حسابات الكاشير لا يمكنها فتح لوحة الإدارة.")}</p></div></div>
+              <div className="user-storage-note"><span>⌂</span><p><strong>{tr("Saved on this POS device", "محفوظ على جهاز نقطة البيع هذا")}</strong>{tr("Every added or edited account is used immediately by the sign-in screen.", "كل حساب تتم إضافته أو تعديله يصبح جاهزاً فوراً على شاشة تسجيل الدخول.")}</p></div>
+              <div className="user-grid">
+                {accounts.map((user) => (
                   <article className={`user-card ${user.active ? "" : "is-disabled"}`} key={user.id}>
                     <span className="user-avatar">{user.initials}</span>
                     <div className="user-card-copy">
@@ -473,4 +2892,3 @@ function ReceiptContent({ receipt, money, tr }: {
     </article>
   );
 }
-
