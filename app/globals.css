@@ -275,3 +275,8 @@
 .auth-mobile-brand img{width:210px;max-width:72vw;height:auto;object-fit:contain}
 .side-brand{display:block;padding:0 6px 22px}
 .side-brand img{display:block;width:154px;max-width:100%;height:auto;object-fit:contain;filter:brightness(0) invert(1)}
+.sidebar nav{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+@media(max-width:720px){
+  .sidebar nav{display:flex;justify-content:flex-start;gap:4px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;padding-bottom:2px;scrollbar-width:thin}
+  .sidebar nav button,.sidebar nav button:nth-child(n+5){display:flex;flex:0 0 78px;width:78px;scroll-snap-align:start}
+}
