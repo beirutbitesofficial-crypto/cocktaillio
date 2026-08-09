@@ -107,7 +107,7 @@ type SalesSnapshot = {
 
 const initialMenuItems: MenuItem[] = [
   { id: "menu-classic-hookah", name: "Classic Hookah", description: "Choose an available flavor", price: 12, image: "", category: "Hookah", available: true, customizable: true },
-  { id: "menu-house-cocktail", name: "House Cocktail", description: "Cocktailliio signature mix", price: 9, image: "", category: "Cocktail", available: true, customizable: false },
+  { id: "menu-house-cocktail", name: "House Cocktail", description: "Cocktaillo signature mix", price: 9, image: "", category: "Cocktail", available: true, customizable: false },
   { id: "menu-lemonade", name: "Fresh Lemonade", description: "Fresh lemon, mint and crushed ice", price: 4, image: "", category: "Cold Drink", available: true, customizable: false },
   { id: "menu-coffee", name: "Coffee", description: "Freshly brewed coffee", price: 3, image: "", category: "Hot Drink", available: true, customizable: false },
   { id: "menu-burger", name: "House Burger", description: "Beef patty, cheese, vegetables and fries", price: 10, image: "", category: "Food", available: true, customizable: true },
@@ -805,7 +805,7 @@ export default function Home() {
 
   function bridgeReceipt(customerReceipt: Receipt) {
     return {
-      storeName: "Cocktailliio", ...customerReceipt,
+      storeName: "Cocktaillo", ...customerReceipt,
       items: customerReceipt.items.map((item) => ({ ...item, price: bridgeAmount(item.price) })),
       subtotal: bridgeAmount(customerReceipt.subtotal),
       discount: customerReceipt.discount ? bridgeAmount(customerReceipt.discount) : undefined,
@@ -1788,8 +1788,8 @@ export default function Home() {
   if (!currentUser) {
     return (
       <main className="auth-screen">
-        <section className="auth-brand" aria-label="Cocktailliio">
-          <div className="auth-brand-logo"><span>C</span><strong>COCKTAILLIIO</strong></div>
+        <section className="auth-brand" aria-label="Cocktaillo">
+          <div className="auth-brand-logo"><img src="/cocktaillo-logo.png" alt="Cocktaillo Resto Café"/></div>
           <div>
             <p>{tr("RESTO CAFÉ • LOUNGE • HOOKAH • COCKTAILS", "مطعم ومقهى ولاونج وأرجيلة وكوكتيلات")}</p>
             <h1>{tr("One clear start for every shift.", "دخول واضح لكل دوام.")}</h1>
@@ -1798,7 +1798,7 @@ export default function Home() {
               "يفتح الكاشير الأدوات التي يحتاجها فقط، ويدخل المدير بحسابه الخاص للتحكم الكامل.",
             )}</span>
           </div>
-          <small>Cocktailliio POS • v1.0</small>
+          <small>Cocktaillo POS • v1.0</small>
         </section>
         <section className="auth-panel">
           <div className="auth-language">
@@ -1810,7 +1810,7 @@ export default function Home() {
             </button>
           </div>
           <div className="auth-card">
-            <div className="auth-mobile-brand"><span>C</span><strong>COCKTAILLIIO</strong></div>
+            <div className="auth-mobile-brand"><img src="/cocktaillo-logo.png" alt="Cocktaillo Resto Café"/></div>
             <p className="page-kicker">{tr("STAFF SIGN IN", "دخول الموظفين")}</p>
             <h2>{tr("Welcome back", "أهلاً بعودتك")}</h2>
             <p>{tr(
@@ -1853,7 +1853,7 @@ export default function Home() {
               </label>
               {loginError && <p className="auth-error" role="alert">{loginError}</p>}
               <button className="auth-submit" type="submit" disabled={!accountsReady || !loginForm.username.trim() || !loginForm.password}>
-                {tr("Sign in to Cocktailliio", "تسجيل الدخول إلى كوكتايليو")} <span>→</span>
+                {tr("Sign in to Cocktaillo", "تسجيل الدخول إلى كوكتايلو")} <span>→</span>
               </button>
             </form>
             <div className="auth-security-note">
@@ -1869,7 +1869,7 @@ export default function Home() {
     );
   }
 
-  const title = language === "ar" ? arabicNav[view] : nav.find((item) => item.id === view)?.label ?? "Cocktailliio";
+  const title = language === "ar" ? arabicNav[view] : nav.find((item) => item.id === view)?.label ?? "Cocktaillo";
   const confirmationUser = userConfirmation
     ? accounts.find((account) => account.id === userConfirmation.userId) ?? null
     : null;
@@ -2369,7 +2369,7 @@ export default function Home() {
       )}
       <aside className="sidebar">
         <button className="side-brand" onClick={() => navigate(role === "manager" ? "dashboard" : "pos")}>
-          <span>C</span><strong>COCKTAILLIIO</strong>
+          <img src="/cocktaillo-logo.png" alt="Cocktaillo Resto Café"/>
         </button>
         <div className="nav-label">WORKSPACE</div>
         <nav>
@@ -2383,7 +2383,7 @@ export default function Home() {
           <div className={`shift-state ${shiftOpen ? "open" : ""}`}>
             <i /> <span>{shiftOpen ? tr("Shift is open", "الدوام مفتوح") : tr("Shift is closed", "الدوام مغلق")}</span>
           </div>
-          <small>Cocktailliio POS • v1.0</small>
+          <small>Cocktaillo POS • v1.0</small>
         </div>
       </aside>
 
@@ -2406,7 +2406,7 @@ export default function Home() {
           {view === "dashboard" && role === "manager" && (
             <>
               <div className="welcome-row">
-                <div><p className="page-kicker">LIVE OVERVIEW</p><h2>{tr(`Good evening, ${currentUser.name.split(" ")[0]}.`, `مساء الخير، ${currentUser.name.split(" ")[0]}.`)}</h2><p>Here&apos;s what&apos;s happening at Cocktailliio today.</p></div>
+                <div><p className="page-kicker">LIVE OVERVIEW</p><h2>{tr(`Good evening, ${currentUser.name.split(" ")[0]}.`, `مساء الخير، ${currentUser.name.split(" ")[0]}.`)}</h2><p>Here&apos;s what&apos;s happening at Cocktaillo today.</p></div>
                 <button className="primary-button" onClick={() => navigate("reports")}>View full report →</button>
               </div>
               <div className="metric-grid">
@@ -2847,7 +2847,4 @@ function ReceiptContent({ receipt, money, tr }: {
         <strong>{tr("Scan to follow us on Instagram", "امسح الرمز وتابعنا على إنستغرام")}</strong>
         <span>@cocktailliio</span>
       </a>
-      <p className="thermal-footer"><strong>{tr("Thank you!", "شكراً!")}</strong><span>Cocktailliio • Resto café, lounge, hookah and cocktails</span><small>JMR Mall • Mazboud, Chouf</small></p>
-    </article>
-  );
-}
+      <p className="thermal-footer"><strong>{tr("Thank you!", "شكراً!")}</strong><span>Cocktailliio • Resto café, lounge, hookah and cocktails</span><small>JMR Mall • Mazboud, C
