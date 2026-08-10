@@ -266,7 +266,7 @@ const emptyExpenseForm: ExpenseFormState = { item: "", category: "Other", amount
 const emptyInventoryForm: InventoryFormState = { item: "", category: "", stock: "", unit: "g", min: "", cost: "" };
 
 const userStorageKey = "cocktailliio-users-v1";
-const menuStorageKey = "cocktailliio-menu-v2";
+const menuStorageKey = "cocktailliio-menu-v3";
 const toppingStorageKey = "cocktailliio-addons-v1";
 const expenseStorageKey = "cocktailliio-expenses-v1";
 const inventoryStorageKey = "cocktailliio-inventory-v1";
