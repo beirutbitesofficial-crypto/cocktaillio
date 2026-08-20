@@ -25,6 +25,7 @@ export async function posApi<T>(path: string, options: RequestInit = {}): Promis
 export type BackendBootstrap = {
   user: { id: string; username: string; name: string; role: "admin" | "manager" | "cashier" };
   menu: Array<{ id: string; name: string; description: string; price_cents: number; image_url: string | null; available: number; customizable: number; category: string }>;
+  categories: Array<{id:string;name:string;sort_order:number}>;
   addons: Array<{ id: string; name: string; price_cents: number; emoji: string; available: number }>;
   inventory: Array<{ id: string; name: string; category: string; quantity_base: number; alert_quantity_base: number; display_unit: string; cost_micros_per_base: number }>;
   tables: Array<{ id: string; name: string; capacity: number; current_guests: number; status: string }>;
