@@ -8,10 +8,10 @@ type Currency = "USD" | "LBP";
 type Language = "en" | "ar";
 type View = "dashboard" | "pos" | "tables" | "shift" | "inventory" | "menu" | "expenses" | "users" | "reports" | "settings";
 type TableStatus = "available" | "occupied" | "reserved";
-type RestaurantTable = { number: number; seats: number; currentGuests?: number; status: TableStatus; order?: string; total?: number };
+type RestaurantTable = { id: string; number: number; seats: number; currentGuests?: number; status: TableStatus; order?: string; total?: number };
 type ReservationStatus = "upcoming" | "seated" | "completed" | "cancelled" | "no-show";
 type Reservation = { id: string; customerName: string; guests: number; tableNumber: number; date: string; time: string; phone: string; notes: string; status: ReservationStatus };
-type TableEditor = { number: number; capacity: string; guests: string; status: TableStatus } | null;
+type TableEditor = { mode: "add" | "edit"; id: string | null; number: number; capacity: string; guests: string; status: TableStatus } | null;
 type ReservationForm = { customerName: string; guests: string; tableNumber: string; date: string; time: string; phone: string; notes: string };
 type CounterOrderType = "Dine-in" | "Takeaway" | "Delivery";
 type OrderType = CounterOrderType;
@@ -197,18 +197,18 @@ const initialInventory: InventoryItem[] = [
 ];
 
 const initialTables: RestaurantTable[] = [
-  { number: 1, seats: 2, status: "occupied", order: "#1042", total: 24 },
-  { number: 2, seats: 4, status: "available" },
-  { number: 3, seats: 4, status: "reserved" },
-  { number: 4, seats: 2, status: "occupied", order: "#1039", total: 31.5 },
-  { number: 5, seats: 6, status: "available" },
-  { number: 6, seats: 4, status: "occupied", order: "#1041", total: 18 },
-  { number: 7, seats: 2, status: "available" },
-  { number: 8, seats: 8, status: "reserved" },
-  { number: 9, seats: 4, status: "available" },
-  { number: 10, seats: 2, status: "available" },
-  { number: 11, seats: 4, status: "occupied", order: "#1038", total: 46 },
-  { number: 12, seats: 6, status: "available" },
+  { id:"table-1", number: 1, seats: 2, status: "occupied", order: "#1042", total: 24 },
+  { id:"table-2", number: 2, seats: 4, status: "available" },
+  { id:"table-3", number: 3, seats: 4, status: "reserved" },
+  { id:"table-4", number: 4, seats: 2, status: "occupied", order: "#1039", total: 31.5 },
+  { id:"table-5", number: 5, seats: 6, status: "available" },
+  { id:"table-6", number: 6, seats: 4, status: "occupied", order: "#1041", total: 18 },
+  { id:"table-7", number: 7, seats: 2, status: "available" },
+  { id:"table-8", number: 8, seats: 8, status: "reserved" },
+  { id:"table-9", number: 9, seats: 4, status: "available" },
+  { id:"table-10", number: 10, seats: 2, status: "available" },
+  { id:"table-11", number: 11, seats: 4, status: "occupied", order: "#1038", total: 46 },
+  { id:"table-12", number: 12, seats: 6, status: "available" },
 ];
 const initialKitchenOrders: KitchenOrder[] = [
   { id: 1042, number: "#1042", type: "Dine-in", items: ["Penne Rosé", "+ Chicken", "+ Parmesan"], status: "pending", time: "2 min", customer: "Table 1" },
@@ -739,8 +739,8 @@ export default function Home() {
   useEffect(() => {
     const savedTables = parseOperationalCollection(localStorage.getItem(tablesStorageKey), isRestaurantTable);
     const legacyReset = localStorage.getItem(expenseStorageKey) === "[]" && localStorage.getItem(inventoryStorageKey) === "[]";
-    const cleanTables = initialTables.map(({ number, seats }) => ({ number, seats, status: "available" as const }));
-    setTables(savedTables ?? (legacyReset ? cleanTables : initialTables));
+    const cleanTables = initialTables.map(({ id, number, seats }) => ({ id, number, seats, status: "available" as const }));
+    setTables(savedTables?.map((table) => ({ ...table, id: table.id ?? `table-${table.number}` })) ?? (legacyReset ? cleanTables : initialTables));
     setTablesReady(true);
   }, []);
 
@@ -1061,9 +1061,9 @@ export default function Home() {
 
     const amount = currency === "LBP" ? enteredAmount / exchangeRate : enteredAmount;
     let persistedId: string | null = null;
-    if (hasBackendConfig() && !existing) {
+    if (hasBackendConfig()) {
       try {
-        const result = await posApi<{ id: string }>("/api/expenses", { method: "POST", body: JSON.stringify({ description: item, category: expenseForm.category, amountCents: Math.round(amount * 100), paidFrom: expenseForm.paidFrom, expenseDate: expenseForm.date }) });
+        const result = await posApi<{ id: string }>(existing?`/api/expenses/${encodeURIComponent(existing.id)}`:"/api/expenses", { method: existing?"PUT":"POST", body: JSON.stringify({ description: item, category: expenseForm.category, amountCents: Math.round(amount * 100), paidFrom: expenseForm.paidFrom, expenseDate: expenseForm.date }) });
         persistedId = result.id;
       } catch (error) { setExpenseFormError(error instanceof Error ? error.message : tr("Could not save expense.", "تعذر حفظ المصروف.")); return; }
     }
@@ -1083,8 +1083,9 @@ export default function Home() {
     showNotice(tr(existing ? "Expense updated" : "Expense added", existing ? "تم تعديل المصروف" : "تمت إضافة المصروف"));
   }
 
-  function deleteExpense() {
+  async function deleteExpense() {
     if (!expenseDeleteConfirmation) return;
+    try{if(hasBackendConfig())await posApi(`/api/expenses/${encodeURIComponent(expenseDeleteConfirmation.id)}`,{method:"DELETE"});}catch(error){showNotice(error instanceof Error?error.message:tr("Could not delete expense.","تعذر حذف المصروف."));return;}
     setExpenses((current) => current.filter((expense) => expense.id !== expenseDeleteConfirmation.id));
     showNotice(tr("Expense deleted", "تم حذف المصروف"));
     setExpenseDeleteConfirmation(null);
@@ -1124,7 +1125,7 @@ export default function Home() {
     setInventoryFormError("");
   }
 
-  function submitInventoryItem(event: FormEvent<HTMLFormElement>) {
+  async function submitInventoryItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!inventoryEditor) return;
     const itemName = inventoryForm.item.trim().replace(/\s+/g, " ");
@@ -1155,8 +1156,10 @@ export default function Home() {
     }
 
     const cost = currency === "LBP" ? enteredCost / exchangeRate : enteredCost;
+    let nextId=existing?.id ?? crypto.randomUUID();
+    if(hasBackendConfig()) try { const result=await posApi<{id:string}>(existing?`/api/inventory/${encodeURIComponent(existing.id)}`:"/api/inventory",{method:existing?"PUT":"POST",body:JSON.stringify({name:itemName,category,quantityBase:stock,alertQuantityBase:min,displayUnit:inventoryForm.unit==="item"?"piece":inventoryForm.unit==="box"?"pack":inventoryForm.unit,costMicrosPerBase:Math.round(cost*1_000_000)})});nextId=result.id;} catch(error){setInventoryFormError(error instanceof Error?error.message:tr("Could not save inventory item.","تعذر حفظ صنف المخزون."));return;}
     const nextItem: InventoryItem = {
-      id: existing?.id ?? crypto.randomUUID(),
+      id: nextId,
       item: itemName,
       category,
       stock,
@@ -1171,8 +1174,9 @@ export default function Home() {
     showNotice(tr(existing ? "Inventory item updated" : "Inventory item added", existing ? "تم تعديل صنف المخزون" : "تمت إضافة صنف المخزون"));
   }
 
-  function deleteInventoryItem() {
+  async function deleteInventoryItem() {
     if (!inventoryDeleteConfirmation) return;
+    try{if(hasBackendConfig())await posApi(`/api/inventory/${encodeURIComponent(inventoryDeleteConfirmation.id)}`,{method:"DELETE"});}catch(error){showNotice(error instanceof Error?error.message:tr("Could not delete inventory item.","تعذر حذف صنف المخزون."));return;}
     setInventory((current) => current.filter((item) => item.id !== inventoryDeleteConfirmation.id));
     showNotice(tr("Inventory item deleted", "تم حذف صنف المخزون"));
     setInventoryDeleteConfirmation(null);
@@ -1190,7 +1194,7 @@ export default function Home() {
     setRestockError("");
   }
 
-  function submitRestock(event: FormEvent<HTMLFormElement>) {
+  async function submitRestock(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!restockTarget) return;
     const amount = Number(restockAmount.replace(/,/g, ""));
@@ -1198,6 +1202,7 @@ export default function Home() {
       setRestockError(tr("Enter a quantity greater than zero.", "أدخل كمية أكبر من صفر."));
       return;
     }
+    try{if(hasBackendConfig())await posApi(`/api/inventory/${encodeURIComponent(restockTarget.id)}/restock`,{method:"POST",body:JSON.stringify({amount})});}catch(error){setRestockError(error instanceof Error?error.message:tr("Could not restock item.","تعذر تحديث المخزون."));return;}
     setInventory((current) => current.map((item) => item.id === restockTarget.id ? { ...item, stock: item.stock + amount } : item));
     showNotice(tr(`${restockTarget.item} restocked`, `تمت زيادة مخزون ${restockTarget.item}`));
     closeRestock();
@@ -1268,7 +1273,7 @@ export default function Home() {
     setMenuItems(data.menu.map((item) => ({ id: item.id, name: item.name, description: item.description, price: item.price_cents / 100, image: item.image_url ?? "", category: item.category as MenuCategory, available: Boolean(item.available), customizable: Boolean(item.customizable) })));
     setToppings(data.addons.map((item) => ({ id: item.id, name: item.name, price: item.price_cents / 100, emoji: item.emoji, available: Boolean(item.available) })));
     setInventory(data.inventory.map((item) => ({ id: item.id, item: item.name, category: item.category, stock: item.quantity_base, unit: (item.display_unit === "piece" ? "item" : item.display_unit === "pack" ? "box" : item.display_unit) as InventoryUnit, min: item.alert_quantity_base, cost: item.cost_micros_per_base / 1_000_000 })));
-    setTables(data.tables.map((table) => ({ number: Number(table.name.match(/\d+/)?.[0] ?? table.id.match(/\d+/)?.[0] ?? 0), seats: table.capacity, currentGuests: table.current_guests, status: table.status as TableStatus })));
+    setTables(data.tables.map((table) => ({ id: table.id, number: Number(table.name.match(/\d+/)?.[0] ?? table.id.match(/\d+/)?.[0] ?? 0), seats: table.capacity, currentGuests: table.current_guests, status: table.status as TableStatus })));
     setReservations(data.reservations.map((raw) => {
       const reservation = raw as { id: string; customer_name: string; guest_count: number; table_id: string; starts_at: string; phone?: string | null; notes?: string | null; status: string };
       const start = new Date(reservation.starts_at);
@@ -1368,7 +1373,7 @@ export default function Home() {
     setShowUserPassword(false);
   }
 
-  function submitUser(event: FormEvent<HTMLFormElement>) {
+  async function submitUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!userEditor) return;
 
@@ -1450,14 +1455,17 @@ export default function Home() {
         role: userForm.role,
         active: userForm.active,
       };
+      try{if(hasBackendConfig())await posApi(`/api/users/${encodeURIComponent(existing.id)}`,{method:"PUT",body:JSON.stringify({name:cleanName,username:cleanUsername,password:passwordChanged?userForm.password:undefined,role:userForm.role,active:userForm.active})});}catch(error){setUserFormError(error instanceof Error?error.message:tr("Could not update user.","تعذر تعديل المستخدم."));return;}
       setAccounts((current) => current.map((account) => account.id === existing.id ? updatedAccount : account));
       closeUserEditor();
       showNotice(tr(`${cleanName} updated`, `تم تعديل ${cleanName}`));
       return;
     }
 
+    let newUserId=typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `user-${Date.now()}`;
+    try{if(hasBackendConfig()){const result=await posApi<{id:string}>("/api/users",{method:"POST",body:JSON.stringify({name:cleanName,username:cleanUsername,password:userForm.password,role:userForm.role,active:userForm.active})});newUserId=result.id;}}catch(error){setUserFormError(error instanceof Error?error.message:tr("Could not add user.","تعذر إضافة المستخدم."));return;}
     const newAccount: UserAccount = {
-      id: typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `user-${Date.now()}`,
+      id: newUserId,
       name: cleanName,
       initials: makeInitials(cleanName),
       username: cleanUsername,
@@ -1491,13 +1499,14 @@ export default function Home() {
     setUserConfirmation({ kind, userId: user.id });
   }
 
-  function activateUser(user: UserAccount) {
+  async function activateUser(user: UserAccount) {
     setUserMenuId(null);
+    try{if(hasBackendConfig())await posApi(`/api/users/${encodeURIComponent(user.id)}`,{method:"PUT",body:JSON.stringify({name:user.name,username:user.username,role:user.role,active:true})});}catch(error){showNotice(error instanceof Error?error.message:"Could not activate user");return;}
     setAccounts((current) => current.map((account) => account.id === user.id ? { ...account, active: true } : account));
     showNotice(tr(`${user.name} activated`, `تم تفعيل ${user.name}`));
   }
 
-  function confirmUserChange() {
+  async function confirmUserChange() {
     if (!userConfirmation) return;
     const target = accounts.find((account) => account.id === userConfirmation.userId);
     if (!target) {
@@ -1511,11 +1520,13 @@ export default function Home() {
     }
 
     if (userConfirmation.kind === "deactivate") {
+      try{if(hasBackendConfig())await posApi(`/api/users/${encodeURIComponent(target.id)}`,{method:"PUT",body:JSON.stringify({name:target.name,username:target.username,role:target.role,active:false})});}catch(error){showNotice(error instanceof Error?error.message:"Could not deactivate user");return;}
       setAccounts((current) => current.map((account) => (
         account.id === target.id ? { ...account, active: false } : account
       )));
       showNotice(tr(`${target.name} deactivated`, `تم تعطيل ${target.name}`));
     } else {
+      try{if(hasBackendConfig())await posApi(`/api/users/${encodeURIComponent(target.id)}`,{method:"DELETE"});}catch(error){showNotice(error instanceof Error?error.message:"Could not delete user");return;}
       setAccounts((current) => current.filter((account) => account.id !== target.id));
       showNotice(tr(`${target.name} deleted`, `تم حذف ${target.name}`));
     }
@@ -1567,21 +1578,19 @@ export default function Home() {
 
   async function uploadMenuImage(file: File | undefined) {
     if (!file) return;
-    if (!/^(image\/jpeg|image\/png|image\/webp)$/.test(file.type) || file.size > 5 * 1024 * 1024) {
-      setMenuFormError(tr("Choose a JPG, PNG or WebP image smaller than 5 MB.", "اختر صورة JPG أو PNG أو WebP أصغر من 5 ميغابايت.")); return;
+    if (!/^(image\/jpeg|image\/png|image\/webp)$/.test(file.type) || file.size > 750 * 1024) {
+      setMenuFormError(tr("Choose a JPG, PNG or WebP image smaller than 750 KB.", "اختر صورة JPG أو PNG أو WebP أصغر من 750 كيلوبايت.")); return;
     }
     setMenuImageUploading(true); setMenuFormError("");
     try {
-      const response = await fetch("/api/uploads/menu-image", { method: "POST", headers: { "Content-Type": file.type }, body: file });
-      const result = await response.json() as { url?: string; error?: string };
-      if (!response.ok || !result.url) throw new Error(result.error ?? "Image upload failed.");
-      setMenuItemForm((current) => ({ ...current, image: result.url! }));
+      const image = await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error("Image upload failed."));reader.readAsDataURL(file);});
+      setMenuItemForm((current) => ({ ...current, image }));
     } catch (error) {
       setMenuFormError(error instanceof Error ? error.message : tr("Image upload failed.", "فشل رفع الصورة."));
     } finally { setMenuImageUploading(false); }
   }
 
-  function submitMenuEntry(event: FormEvent<HTMLFormElement>) {
+  async function submitMenuEntry(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!menuEditor) return;
 
@@ -1607,13 +1616,15 @@ export default function Home() {
         setMenuFormError(tr("A menu item with this name already exists.", "يوجد صنف بهذا الاسم بالفعل."));
         return;
       }
-      if (image && !/^(https?:\/\/|\/)/i.test(image)) {
+      if (image && !/^(https?:\/\/|\/|data:image\/(jpeg|png|webp);base64,)/i.test(image)) {
         setMenuFormError(tr("Photo must be a valid web URL, or leave it blank.", "يجب أن تكون الصورة رابطاً صحيحاً، أو اتركها فارغة."));
         return;
       }
 
+      let nextId=existing?.id ?? (typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `menu-${Date.now()}`);
+      try{if(hasBackendConfig()){const result=await posApi<{id:string}>(existing?`/api/menu-items/${encodeURIComponent(existing.id)}`:"/api/menu-items",{method:existing?"PUT":"POST",body:JSON.stringify({name,description,priceCents:Math.round(price*100),imageUrl:image,category:menuItemForm.category,available:menuItemForm.available,customizable:menuItemForm.customizable})});nextId=result.id;}}catch(error){setMenuFormError(error instanceof Error?error.message:tr("Could not save menu item.","تعذر حفظ الصنف."));return;}
       const nextItem: MenuItem = {
-        id: existing?.id ?? (typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `menu-${Date.now()}`),
+        id: nextId,
         name,
         description,
         price,
@@ -1653,8 +1664,10 @@ export default function Home() {
       return;
     }
 
+    let nextToppingId=existing?.id ?? (typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `topping-${Date.now()}`);
+    try{if(hasBackendConfig()){const result=await posApi<{id:string}>(existing?`/api/addons/${encodeURIComponent(existing.id)}`:"/api/addons",{method:existing?"PUT":"POST",body:JSON.stringify({name,priceCents:Math.round(price*100),emoji:toppingForm.emoji.trim()||"✦",available:toppingForm.available})});nextToppingId=result.id;}}catch(error){setMenuFormError(error instanceof Error?error.message:tr("Could not save topping.","تعذر حفظ الإضافة."));return;}
     const nextTopping: Topping = {
-      id: existing?.id ?? (typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `topping-${Date.now()}`),
+      id: nextToppingId,
       name,
       price,
       emoji: toppingForm.emoji.trim() || "✦",
@@ -1670,22 +1683,25 @@ export default function Home() {
     ));
   }
 
-  function toggleMenuEntry(kind: "item" | "topping", id: string) {
+  async function toggleMenuEntry(kind: "item" | "topping", id: string) {
     if (kind === "item") {
       const target = menuItems.find((item) => item.id === id);
       if (!target) return;
+      try{if(hasBackendConfig())await posApi(`/api/menu-items/${encodeURIComponent(id)}`,{method:"PUT",body:JSON.stringify({name:target.name,description:target.description,priceCents:Math.round(target.price*100),imageUrl:target.image,category:target.category,available:!target.available,customizable:target.customizable})});}catch(error){showNotice(error instanceof Error?error.message:"Could not update menu item");return;}
       setMenuItems((current) => current.map((item) => item.id === id ? { ...item, available: !item.available } : item));
       showNotice(tr(`${target.name} ${target.available ? "hidden" : "available"}`, `${target.name} ${target.available ? "مخفي" : "متاح"}`));
       return;
     }
     const target = toppings.find((topping) => topping.id === id);
     if (!target) return;
+    try{if(hasBackendConfig())await posApi(`/api/addons/${encodeURIComponent(id)}`,{method:"PUT",body:JSON.stringify({name:target.name,priceCents:Math.round(target.price*100),emoji:target.emoji,available:!target.available})});}catch(error){showNotice(error instanceof Error?error.message:"Could not update topping");return;}
     setToppings((current) => current.map((topping) => topping.id === id ? { ...topping, available: !topping.available } : topping));
     showNotice(tr(`${target.name} ${target.available ? "hidden" : "available"}`, `${target.name} ${target.available ? "مخفي" : "متاح"}`));
   }
 
-  function confirmMenuDelete() {
+  async function confirmMenuDelete() {
     if (!menuDeleteConfirmation) return;
+    try{if(hasBackendConfig())await posApi(`/${menuDeleteConfirmation.kind==="item"?"api/menu-items":"api/addons"}/${encodeURIComponent(menuDeleteConfirmation.id)}`,{method:"DELETE"});}catch(error){showNotice(error instanceof Error?error.message:"Could not delete menu entry");return;}
     if (menuDeleteConfirmation.kind === "item") {
       setMenuItems((current) => current.filter((item) => item.id !== menuDeleteConfirmation.id));
     } else {
@@ -1715,7 +1731,7 @@ export default function Home() {
       try { await posApi("/api/admin/factory-reset", { method: "POST", body: JSON.stringify({ confirmation: factoryResetConfirmation }) }); }
       catch (error) { showNotice(error instanceof Error ? error.message : tr("Factory reset failed.", "فشلت إعادة الضبط.")); return; }
     }
-    const cleanTables = tables.map(({ number, seats }) => ({ number, seats, currentGuests: 0, status: "available" as const }));
+    const cleanTables = tables.map(({ id, number, seats }) => ({ id, number, seats, currentGuests: 0, status: "available" as const }));
 
     localStorage.setItem(expenseStorageKey, JSON.stringify([]));
     localStorage.setItem(inventoryStorageKey, JSON.stringify(inventory.map((item) => ({ ...item, stock: 0 }))));
@@ -1798,7 +1814,7 @@ export default function Home() {
           headers: { "Idempotency-Key": crypto.randomUUID() },
           body: JSON.stringify({
             orderType: counterOrderType === "Dine-in" ? "dine_in" : counterOrderType.toLowerCase(),
-            tableId: counterOrderType === "Dine-in" && counterTable !== null ? `table-${counterTable}` : null,
+            tableId: counterOrderType === "Dine-in" && counterTable !== null ? tables.find((table) => table.number === counterTable)?.id ?? null : null,
             paymentMethod: paymentMethod.toLowerCase(), cashReceivedCents: Math.round(enteredCash * 100),
             customerName: contactName || undefined, customerPhone: contactPhone || undefined,
             deliveryAddress: contactAddress || undefined, driverName: orderContact.driver.trim() || undefined,
@@ -1965,7 +1981,14 @@ export default function Home() {
     const table = tables.find((entry) => entry.number === number);
     if (!table) return;
     setTableFormError("");
-    setTableEditor({ number, capacity: String(table.seats), guests: String(table.currentGuests ?? 0), status: table.status });
+    setTableEditor({ mode: "edit", id: table.id, number, capacity: String(table.seats), guests: String(table.currentGuests ?? 0), status: table.status });
+  }
+
+  function addTable() {
+    let number = 1;
+    while (tables.some((table) => table.number === number)) number += 1;
+    setTableFormError("");
+    setTableEditor({ mode: "add", id: null, number, capacity: "4", guests: "0", status: "available" });
   }
 
   async function saveTable(event: FormEvent<HTMLFormElement>) {
@@ -1980,12 +2003,28 @@ export default function Home() {
       setTableFormError(tr(`This table can seat at most ${capacity} guests.`, `تتسع هذه الطاولة لحد أقصى ${capacity} ضيوف.`)); return;
     }
     const status = guests > 0 ? "occupied" : tableEditor.status;
+    let tableId = tableEditor.id ?? `table-${tableEditor.number}`;
     if (hasBackendConfig()) {
-      try { await posApi(`/api/tables/table-${tableEditor.number}`, { method: "PUT", body: JSON.stringify({ capacity, currentGuests: guests, status }) }); }
+      try {
+        if (tableEditor.mode === "add") {
+          const result = await posApi<{ id: string }>("/api/tables", { method: "POST", body: JSON.stringify({ name: `Table ${tableEditor.number}`, capacity }) });
+          tableId = result.id;
+        } else await posApi(`/api/tables/${encodeURIComponent(tableId)}`, { method: "PUT", body: JSON.stringify({ capacity, currentGuests: guests, status }) });
+      }
       catch (error) { setTableFormError(error instanceof Error ? error.message : tr("Could not update table.", "تعذر تحديث الطاولة.")); return; }
     }
-    setTables((current) => current.map((table) => table.number === tableEditor.number ? { ...table, seats: capacity, currentGuests: guests, status } : table));
-    setTableEditor(null); showNotice(tr("Table updated", "تم تحديث الطاولة"));
+    setTables((current) => tableEditor.mode === "add" ? [...current, { id: tableId, number: tableEditor.number, seats: capacity, currentGuests: 0, status: "available" }] : current.map((table) => table.number === tableEditor.number ? { ...table, seats: capacity, currentGuests: guests, status } : table));
+    const wasAdded = tableEditor.mode === "add";
+    setTableEditor(null); showNotice(tr(wasAdded ? "Table added" : "Table updated", wasAdded ? "تمت إضافة الطاولة" : "تم تحديث الطاولة"));
+  }
+
+  async function deleteTable() {
+    if (!tableEditor?.id || tableEditor.mode !== "edit") return;
+    try { if (hasBackendConfig()) await posApi(`/api/tables/${encodeURIComponent(tableEditor.id)}`, { method: "DELETE" }); }
+    catch (error) { setTableFormError(error instanceof Error ? error.message : tr("Could not delete table.", "تعذر حذف الطاولة.")); return; }
+    const removedId = tableEditor.id;
+    setTables((current) => current.filter((table) => table.id !== removedId));
+    setTableEditor(null); showNotice(tr("Table deleted", "تم حذف الطاولة"));
   }
 
   function openReservation() {
@@ -2006,7 +2045,7 @@ export default function Home() {
     let reservationId = crypto.randomUUID();
     if (hasBackendConfig()) {
       try {
-        const result = await posApi<{ id: string }>("/api/reservations", { method: "POST", body: JSON.stringify({ customerName: reservationForm.customerName.trim(), guestCount: guests, tableId: `table-${tableNumber}`, startsAt: new Date(`${reservationForm.date}T${reservationForm.time}:00`).toISOString(), phone: reservationForm.phone.trim(), notes: reservationForm.notes.trim() }) });
+        const result = await posApi<{ id: string }>("/api/reservations", { method: "POST", body: JSON.stringify({ customerName: reservationForm.customerName.trim(), guestCount: guests, tableId: table.id, startsAt: new Date(`${reservationForm.date}T${reservationForm.time}:00`).toISOString(), phone: reservationForm.phone.trim(), notes: reservationForm.notes.trim() }) });
         reservationId = result.id;
       } catch (error) { setReservationFormError(error instanceof Error ? error.message : tr("Could not create reservation.", "تعذر إنشاء الحجز.")); return; }
     }
@@ -2255,12 +2294,12 @@ export default function Home() {
       {tableEditor && (
         <div className="menu-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setTableEditor(null); }}>
           <section className="menu-modal-dialog compact-dialog" role="dialog" aria-modal="true" aria-labelledby="table-editor-title">
-            <header className="menu-modal-header"><div><p>TABLE {tableEditor.number}</p><h2 id="table-editor-title">{tr("Table occupancy", "إشغال الطاولة")}</h2></div><button type="button" onClick={() => setTableEditor(null)} aria-label="Close">×</button></header>
+            <header className="menu-modal-header"><div><p>TABLE {tableEditor.number}</p><h2 id="table-editor-title">{tr(tableEditor.mode === "add" ? "Add table" : "Table occupancy", tableEditor.mode === "add" ? "إضافة طاولة" : "إشغال الطاولة")}</h2></div><button type="button" onClick={() => setTableEditor(null)} aria-label="Close">×</button></header>
             <form onSubmit={saveTable}><div className="menu-modal-scroll"><div className="menu-form-grid">
               <label className="menu-field">{tr("Maximum capacity", "السعة القصوى")}<input autoFocus inputMode="numeric" value={tableEditor.capacity} onChange={(event) => { setTableEditor((current) => current ? { ...current, capacity: event.target.value.replace(/\D/g, "") } : current); setTableFormError(""); }}/></label>
               <label className="menu-field">{tr("Current guests", "عدد الضيوف الحالي")}<input inputMode="numeric" value={tableEditor.guests} onChange={(event) => { setTableEditor((current) => current ? { ...current, guests: event.target.value.replace(/\D/g, "") } : current); setTableFormError(""); }}/></label>
               <label className="menu-field wide">{tr("Status", "الحالة")}<select value={tableEditor.status} onChange={(event) => setTableEditor((current) => current ? { ...current, status: event.target.value as TableStatus } : current)}><option value="available">Available</option><option value="occupied">Occupied</option><option value="reserved">Reserved</option></select></label>
-            </div>{tableFormError && <p className="menu-form-error" role="alert">{tableFormError}</p>}</div><footer className="menu-modal-actions"><button type="button" onClick={() => setTableEditor(null)}>{tr("Cancel", "إلغاء")}</button><button className="menu-save-action" type="submit">{tr("Save table", "حفظ الطاولة")}</button></footer></form>
+            </div>{tableFormError && <p className="menu-form-error" role="alert">{tableFormError}</p>}</div><footer className="menu-modal-actions">{tableEditor.mode === "edit" && <button className="danger-action" type="button" onClick={deleteTable}>{tr("Delete table", "حذف الطاولة")}</button>}<button type="button" onClick={() => setTableEditor(null)}>{tr("Cancel", "إلغاء")}</button><button className="menu-save-action" type="submit">{tr("Save table", "حفظ الطاولة")}</button></footer></form>
           </section>
         </div>
       )}
@@ -2823,7 +2862,7 @@ export default function Home() {
 
           {view === "tables" && (
             <section className="tables-page">
-              <div className="welcome-row compact"><div><p className="page-kicker">DINING ROOM</p><h2>{tr("Tables & reservations", "الطاولات والحجوزات")}</h2><p>{tr("Manage live guest occupancy and upcoming reservations.", "إدارة إشغال الضيوف والحجوزات القادمة.")}</p></div><div className="table-page-actions"><div className="legend"><span><i className="available"/>Available</span><span><i className="occupied"/>Occupied</span><span><i className="reserved"/>Reserved</span></div><button className="primary-button" type="button" onClick={openReservation}>+ {tr("Reservation", "حجز")}</button></div></div>
+              <div className="welcome-row compact"><div><p className="page-kicker">DINING ROOM</p><h2>{tr("Tables & reservations", "الطاولات والحجوزات")}</h2><p>{tr("Manage live guest occupancy and upcoming reservations.", "إدارة إشغال الضيوف والحجوزات القادمة.")}</p></div><div className="table-page-actions"><div className="legend"><span><i className="available"/>Available</span><span><i className="occupied"/>Occupied</span><span><i className="reserved"/>Reserved</span></div><button className="secondary-action" type="button" onClick={addTable}>+ {tr("Table", "طاولة")}</button><button className="primary-button" type="button" onClick={openReservation}>+ {tr("Reservation", "حجز")}</button></div></div>
               <div className="table-grid">{tables.map((table) => <button className={`restaurant-table ${table.status}`} key={table.number} onClick={() => updateTable(table.number)}><span className="table-number">{table.number}</span><small>{tr("Table", "طاولة")}</small><strong>{table.status}</strong><div><span>♙ <b>{table.currentGuests ?? 0} / {table.seats}</b> {tr("Guests", "ضيوف")}</span>{table.order && <span>{table.order}</span>}</div>{table.total && <b>${table.total.toFixed(2)}</b>}</button>)}</div>
               <section className="panel reservations-panel"><div className="panel-head"><div><h3>{tr("Reservations", "الحجوزات")}</h3><p>{tr("Upcoming and seated guests", "الضيوف القادمون والجالسون")}</p></div></div>
                 <div className="reservation-list">{reservations.map((reservation) => <article className="reservation-card" key={reservation.id}><div><strong>{reservation.customerName}</strong><small>{reservation.date} · {reservation.time}{reservation.phone ? ` · ${reservation.phone}` : ""}</small></div><span>{reservation.guests} / {tables.find((table) => table.number === reservation.tableNumber)?.seats ?? "—"} {tr("Guests", "ضيوف")}</span><span>{tr("Table", "طاولة")} {reservation.tableNumber}</span><b className={reservation.status}>{reservation.status}</b>{reservation.status === "upcoming" && <button type="button" onClick={() => seatReservation(reservation)}>{tr("Seat reservation", "إجلاس الحجز")}</button>}</article>)}{!reservations.length && <div className="reservation-empty">{tr("No reservations yet.", "لا توجد حجوزات بعد.")}</div>}</div>
