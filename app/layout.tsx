@@ -5,6 +5,7 @@ import "./brand-green.css";
 import "./service-polish.css";
 import AppRouteBridge from "./app-route-bridge";
 import GlobalModuleNav from "./global-module-nav";
+import RoleUiGuard from "./role-ui-guard";
 
 export const metadata: Metadata = {
   title: "Cocktaillo POS",
@@ -19,7 +20,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body><AppRouteBridge /><GlobalModuleNav />{children}</body>
+      <body><AppRouteBridge /><GlobalModuleNav /><RoleUiGuard />{children}</body>
     </html>
   );
 }
