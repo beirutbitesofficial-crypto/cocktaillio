@@ -1,7 +1,10 @@
 const apiBase = (process.env.NEXT_PUBLIC_POS_API_URL ?? "").replace(/\/$/, "");
 const tokenKey = "cocktaillio-session";
 
-export function hasBackendConfig() { return Boolean(apiBase); }
+// The production app serves its API on the same origin (for example
+// https://steelblue-giraffe-156727.hostingersite.com/api/*). An explicit
+// NEXT_PUBLIC_POS_API_URL is only needed when the API lives on another host.
+export function hasBackendConfig() { return true; }
 export function getSessionToken() { return typeof window === "undefined" ? null : localStorage.getItem(tokenKey); }
 export function saveSessionToken(token: string) { localStorage.setItem(tokenKey, token); }
 export function clearSessionToken() { localStorage.removeItem(tokenKey); }
@@ -23,7 +26,7 @@ export async function posApi<T>(path: string, options: RequestInit = {}): Promis
 }
 
 export type BackendBootstrap = {
-  user: { id: string; username: string; name: string; role: "admin" | "manager" | "cashier" };
+  user: { id: string; username: string; name: string; role: "admin" | "manager" | "cashier" | "waiter" };
   menu: Array<{ id: string; name: string; description: string; price_cents: number; image_url: string | null; available: number; customizable: number; category: string }>;
   categories: Array<{id:string;name:string;sort_order:number}>;
   addons: Array<{ id: string; name: string; price_cents: number; emoji: string; available: number }>;
