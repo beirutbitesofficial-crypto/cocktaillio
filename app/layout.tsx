@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./mobile-nav.css";
 
 export const metadata: Metadata = {
   title: "Cocktaillo POS",
@@ -20,4 +21,3 @@ export default function RootLayout({
     </html>
   );
 }
-
