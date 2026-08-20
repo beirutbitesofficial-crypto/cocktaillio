@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./mobile-nav.css";
 import "./brand-green.css";
+import "./service-polish.css";
 import AppRouteBridge from "./app-route-bridge";
 
 export const metadata: Metadata = {
