@@ -15,7 +15,7 @@ type TableEditor = { mode: "add" | "edit"; id: string | null; number: number; ca
 type ReservationForm = { customerName: string; guests: string; tableNumber: string; date: string; time: string; phone: string; notes: string };
 type CounterOrderType = "Dine-in" | "Takeaway" | "Delivery";
 type OrderType = CounterOrderType;
-type MenuCategory = "Burger sandwich" | "Sandwich" | "Appetizers" | "Salad" | "Platter";
+type MenuCategory = string;
 type MenuItem = {
   id: string;
   name: string;
@@ -554,7 +554,10 @@ export default function Home() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>(initialMenuItems);
   const [toppings, setToppings] = useState<Topping[]>(initialToppings);
   const [menuDataReady, setMenuDataReady] = useState(false);
-  const [menuTab, setMenuTab] = useState<"items" | "toppings">("items");
+  const [categories, setCategories] = useState<Array<{id:string;name:string}>>(menuCategories.map((name,index)=>({id:`category-${index}`,name})));
+  const [categoryName,setCategoryName]=useState("");
+  const [categoryError,setCategoryError]=useState("");
+  const [menuTab, setMenuTab] = useState<"items" | "toppings" | "categories">("items");
   const [posMenuFilter, setPosMenuFilter] = useState<"All" | MenuCategory>("All");
   const [menuEditor, setMenuEditor] = useState<MenuEditor>(null);
   const [menuItemForm, setMenuItemForm] = useState<MenuItemFormState>(emptyMenuItemForm);
@@ -1271,6 +1274,7 @@ export default function Home() {
     setAccounts((current) => [signedIn, ...current.filter((entry) => entry.id !== signedIn.id)]);
     setCurrentUserId(signedIn.id);
     setMenuItems(data.menu.map((item) => ({ id: item.id, name: item.name, description: item.description, price: item.price_cents / 100, image: item.image_url ?? "", category: item.category as MenuCategory, available: Boolean(item.available), customizable: Boolean(item.customizable) })));
+    setCategories(data.categories.map((category)=>({id:category.id,name:category.name})));
     setToppings(data.addons.map((item) => ({ id: item.id, name: item.name, price: item.price_cents / 100, emoji: item.emoji, available: Boolean(item.available) })));
     setInventory(data.inventory.map((item) => ({ id: item.id, item: item.name, category: item.category, stock: item.quantity_base, unit: (item.display_unit === "piece" ? "item" : item.display_unit === "pack" ? "box" : item.display_unit) as InventoryUnit, min: item.alert_quantity_base, cost: item.cost_micros_per_base / 1_000_000 })));
     setTables(data.tables.map((table) => ({ id: table.id, number: Number(table.name.match(/\d+/)?.[0] ?? table.id.match(/\d+/)?.[0] ?? 0), seats: table.capacity, currentGuests: table.current_guests, status: table.status as TableStatus })));
@@ -1543,6 +1547,10 @@ export default function Home() {
       setMenuEditor({ kind, mode: "add", id: null });
     }
   }
+
+  async function addCategory(event:FormEvent<HTMLFormElement>){event.preventDefault();const name=categoryName.trim().replace(/\s+/g," ");if(name.length<2||name.length>50){setCategoryError(tr("Category name must be 2–50 characters.","اسم الفئة يجب أن يكون بين حرفين و50 حرفاً."));return;}if(categories.some(category=>category.name.toLowerCase()===name.toLowerCase())){setCategoryError(tr("This category already exists.","هذه الفئة موجودة بالفعل."));return;}let categoryId=crypto.randomUUID();try{if(hasBackendConfig()){const result=await posApi<{id:string}>("/api/categories",{method:"POST",body:JSON.stringify({name})});categoryId=result.id;}}catch(error){setCategoryError(error instanceof Error?error.message:"Could not add category");return;}setCategories(current=>[...current,{id:categoryId,name}]);setCategoryName("");setCategoryError("");showNotice(tr("Category added","تمت إضافة الفئة"));}
+
+  async function removeCategory(category:{id:string;name:string}){try{if(hasBackendConfig())await posApi(`/api/categories/${encodeURIComponent(category.id)}`,{method:"DELETE"});}catch(error){setCategoryError(error instanceof Error?error.message:"Could not delete category");return;}setCategories(current=>current.filter(entry=>entry.id!==category.id));if(posMenuFilter===category.name)setPosMenuFilter("All");showNotice(tr("Category deleted","تم حذف الفئة"));}
 
   function openEditMenuItem(item: MenuItem) {
     setMenuFormError("");
@@ -2562,7 +2570,7 @@ export default function Home() {
                       <label className="menu-field">
                         {tr("Category", "الفئة")}
                         <select value={menuItemForm.category} onChange={(event) => { const category = event.target.value as MenuCategory; setMenuItemForm((current) => ({ ...current, category })); setMenuFormError(""); }}>
-                          {menuCategories.map((category) => <option value={category} key={category}>{menuCategoryIcon(category)} {category}</option>)}
+                          {categories.map((category) => <option value={category.name} key={category.id}>{menuCategoryIcon(category.name)} {category.name}</option>)}
                         </select>
                       </label>
                       <label className="menu-field">
@@ -2803,7 +2811,7 @@ export default function Home() {
                 <section className={`menu-step ${counterServiceReady ? "" : "locked"}`}>
                   <div className="order-step-copy"><span>2</span><div><p>{tr("STEP 2", "الخطوة ٢")}</p><h3>{tr("Choose a menu item", "اختر صنفاً من القائمة")}</h3></div></div>
                   <div className="pos-category-filter" role="tablist" aria-label={tr("Menu categories", "فئات القائمة")}>
-                    {(["All", ...menuCategories] as const).map((category) => (
+                    {(["All", ...categories.map((entry)=>entry.name)] as const).map((category) => (
                       <button
                         type="button"
                         role="tab"
@@ -2920,14 +2928,15 @@ export default function Home() {
             <section className="menu-page">
               <div className="welcome-row compact menu-heading">
                 <div><p className="page-kicker">{tr("CATALOG CONTROL", "إدارة القائمة")}</p><h2>{tr("Menu management", "إدارة قائمة الطعام")}</h2><p>{tr("Add beverages and dishes, edit toppings and pricing, or hide anything that is unavailable.", "أضف المشروبات والأطباق وعدّل الإضافات والأسعار أو أخفِ أي صنف غير متوفر.")}</p></div>
-                <button className="primary-button" onClick={() => openAddMenuEntry(menuTab === "items" ? "item" : "topping")}>+ {menuTab === "items" ? tr("Add menu item", "إضافة صنف") : tr("Add topping", "إضافة إضافة")}</button>
+                {menuTab !== "categories" && <button className="primary-button" onClick={() => openAddMenuEntry(menuTab === "items" ? "item" : "topping")}>+ {menuTab === "items" ? tr("Add menu item", "إضافة صنف") : tr("Add topping", "إضافة إضافة")}</button>}
               </div>
               <div className="user-storage-note menu-storage-note"><span>⌂</span><p><strong>{tr("Saved on this POS device", "محفوظ على جهاز نقطة البيع هذا")}</strong>{tr("Changes appear immediately in New Order on this same device.", "تظهر التعديلات فوراً في شاشة الطلب الجديد على هذا الجهاز.")}</p></div>
               <div className="menu-tabs" role="tablist" aria-label={tr("Menu management sections", "أقسام إدارة القائمة")}>
                 <button type="button" role="tab" aria-selected={menuTab === "items"} className={`menu-tab ${menuTab === "items" ? "active" : ""}`} onClick={() => setMenuTab("items")}><span>☷</span><strong>{tr("Menu items", "أصناف القائمة")}</strong><b>{menuItems.length}</b></button>
                 <button type="button" role="tab" aria-selected={menuTab === "toppings"} className={`menu-tab ${menuTab === "toppings" ? "active" : ""}`} onClick={() => setMenuTab("toppings")}><span>✦</span><strong>{tr("Toppings", "الإضافات")}</strong><b>{toppings.length}</b></button>
+                <button type="button" role="tab" aria-selected={menuTab === "categories"} className={`menu-tab ${menuTab === "categories" ? "active" : ""}`} onClick={() => setMenuTab("categories")}><span>▦</span><strong>{tr("Categories", "الفئات")}</strong><b>{categories.length}</b></button>
               </div>
-              {menuTab === "items" ? (
+              {menuTab === "categories" ? <section className="category-manager panel"><form onSubmit={addCategory}><label>{tr("New category name","اسم الفئة الجديدة")}<input value={categoryName} onChange={(event)=>{setCategoryName(event.target.value);setCategoryError("");}} placeholder={tr("Example: Desserts","مثال: حلويات")}/></label><button className="primary-button" type="submit">+ {tr("Add category","إضافة فئة")}</button></form>{categoryError&&<p className="menu-form-error" role="alert">{categoryError}</p>}<div className="category-list">{categories.map(category=><article key={category.id}><span>{menuCategoryIcon(category.name)}</span><strong>{category.name}</strong><small>{menuItems.filter(item=>item.category===category.name).length} {tr("items","أصناف")}</small><button type="button" className="danger-action" onClick={()=>removeCategory(category)} disabled={menuItems.some(item=>item.category===category.name)}>× {tr("Delete","حذف")}</button></article>)}</div></section> : menuTab === "items" ? (
                 menuItems.length ? (
                   <div className="menu-management-grid">
                     {menuItems.map((item) => (
