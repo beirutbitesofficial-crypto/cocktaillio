@@ -62,6 +62,11 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
+    // This POS intentionally uses text-only menu buttons. Menu item images are disabled.
+    if (url.pathname === "/api/uploads/menu-image" && request.method === "POST") {
+      return Response.json({ error: "Menu item images are disabled for this POS." }, { status: 410 });
+    }
+
     const serviceResponse = await handleServiceApi(request, env, url);
     if (serviceResponse) return serviceResponse;
 
