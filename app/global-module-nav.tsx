@@ -22,7 +22,7 @@ export default function GlobalModuleNav(){
   const waiter=role==="waiter";
   return <nav className="globalPosNav">
     {!waiter&&<Link href="/">Dashboard</Link>}
-    {!waiter&&<Link href="/">New Order</Link>}
+    {!waiter&&<Link href="/counter">New Order</Link>}
     <Link href="/service">Tables</Link>
     {!waiter&&<Link href="/catalog">Menu</Link>}
     <Link href="/bar">Bar</Link>
