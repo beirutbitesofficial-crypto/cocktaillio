@@ -67,9 +67,6 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
-    const uploadResponse = await handleUploads(request, env, url);
-    if (uploadResponse) return uploadResponse;
-
     const apiResponse = await handlePosApi(request, env, url);
     if (apiResponse) return apiResponse;
 
