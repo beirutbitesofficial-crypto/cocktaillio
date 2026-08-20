@@ -2,6 +2,7 @@ type Statement = ReturnType<D1Database["prepare"]>;
 
 export interface PosEnv {
   DB: D1Database;
+  UPLOADS: R2Bucket;
   FRONTEND_ORIGIN?: string;
 }
 
@@ -328,6 +329,7 @@ export async function handlePosApi(request: Request, env: PosEnv, url: URL): Pro
   if (!url.pathname.startsWith('/api/')) return null;
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(env, request) });
   if (url.pathname === '/api/health') return json(env, request, { ok: true, database: 'd1' });
+  if(request.method==='GET'&&url.pathname.startsWith('/api/uploads/menu/')){const key=url.pathname.slice('/api/uploads/'.length);if(!/^menu\/[a-f0-9-]+\.(jpg|png|webp)$/.test(key))return new Response('Not found',{status:404});const object=await env.UPLOADS.get(key);if(!object)return new Response('Not found',{status:404});const headers=new Headers({'x-content-type-options':'nosniff',etag:object.httpEtag,'access-control-allow-origin':'*'});object.writeHttpMetadata(headers);return new Response(object.body,{headers});}
   if (url.pathname === '/api/auth/login' && request.method === 'POST') {
     try { return await login(request, env); }
     catch (error) { console.error('Login failed', error); return problem(env, request, 500, 'Login service is temporarily unavailable.'); }
@@ -335,6 +337,7 @@ export async function handlePosApi(request: Request, env: PosEnv, url: URL): Pro
   const user = await authenticate(request, env);
   if (!user) return problem(env, request, 401, 'Authentication required.');
   try {
+    if(url.pathname==='/api/uploads/menu-image'&&request.method==='POST'){const contentType=request.headers.get('content-type')??'';if(!['image/jpeg','image/png','image/webp'].includes(contentType)||!request.body)return problem(env,request,415,'Only JPG, PNG and WebP images are allowed.');const extension=contentType==='image/jpeg'?'jpg':contentType.split('/')[1];const key=`menu/${crypto.randomUUID()}.${extension}`;await env.UPLOADS.put(key,request.body,{httpMetadata:{contentType,cacheControl:'public, max-age=31536000, immutable'},customMetadata:{uploadedBy:user.id}});return json(env,request,{key,url:`${url.origin}/api/uploads/${key}`},201);}
     if (url.pathname === '/api/bootstrap' && request.method === 'GET') return bootstrap(request, env, user);
     if (url.pathname === '/api/shifts/open' && request.method === 'POST') return openShift(request, env, user);
     if (url.pathname === '/api/shifts/close' && request.method === 'POST') return closeShift(request, env, user);
