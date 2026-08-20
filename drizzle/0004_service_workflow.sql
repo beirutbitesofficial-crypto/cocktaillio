@@ -1,24 +1,13 @@
-PRAGMA foreign_keys = OFF;
-
--- Rebuild users once so the database accepts the waiter role while preserving
--- all existing user ids referenced by shifts, orders, reservations and audit data.
-CREATE TABLE `users_service_role` (
-  `id` text PRIMARY KEY NOT NULL,
-  `username` text NOT NULL,
-  `password_hash` text NOT NULL,
-  `display_name` text NOT NULL,
-  `role` text NOT NULL CHECK (`role` IN ('admin','manager','cashier','waiter')),
-  `active` integer DEFAULT 1 NOT NULL,
-  `created_at` text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  `updated_at` text DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
-INSERT INTO `users_service_role` (`id`,`username`,`password_hash`,`display_name`,`role`,`active`,`created_at`,`updated_at`)
-SELECT `id`,`username`,`password_hash`,`display_name`,`role`,`active`,`created_at`,`updated_at` FROM `users`;
-DROP TABLE `users`;
-ALTER TABLE `users_service_role` RENAME TO `users`;
-CREATE UNIQUE INDEX `uq_users_username` ON `users` (`username`);
-
 PRAGMA foreign_keys = ON;
+
+-- Keep the core users table unchanged for maximum compatibility with existing
+-- foreign keys. Service-only roles are layered on top of the core account.
+CREATE TABLE IF NOT EXISTS `user_service_roles` (
+  `user_id` text PRIMARY KEY NOT NULL REFERENCES `users`(`id`) ON DELETE CASCADE,
+  `service_role` text NOT NULL CHECK (`service_role` IN ('waiter')),
+  `created_at` text NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` text NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
 CREATE TABLE IF NOT EXISTS `service_checks` (
   `id` text PRIMARY KEY NOT NULL,
@@ -59,8 +48,11 @@ CREATE TABLE IF NOT EXISTS `service_payments` (
 );
 CREATE INDEX IF NOT EXISTS `idx_service_payments_check` ON `service_payments` (`check_id`);
 
--- Bootstrap waiter account. Change the password before production use.
+-- The core role is cashier only to satisfy the original schema constraint.
+-- user_service_roles makes this account an effective waiter everywhere in the
+-- service workflow, and the backend guard blocks it from cashier-only APIs.
 INSERT OR IGNORE INTO `users` (`id`,`username`,`password_hash`,`display_name`,`role`,`active`) VALUES
-('waiter-1','waiter','pbkdf2:100000:c9d3628c5c9d02053f04fb925c8f4cae:175dae8953dfd7b73811cd153986990d4c158f2ff6a653f74fe8edb166af0b69','Waiter','waiter',1);
+('waiter-1','waiter','pbkdf2:100000:c9d3628c5c9d02053f04fb925c8f4cae:175dae8953dfd7b73811cd153986990d4c158f2ff6a653f74fe8edb166af0b69','Waiter','cashier',1);
+INSERT OR REPLACE INTO `user_service_roles` (`user_id`,`service_role`,`updated_at`) VALUES ('waiter-1','waiter',CURRENT_TIMESTAMP);
 
 PRAGMA optimize;
