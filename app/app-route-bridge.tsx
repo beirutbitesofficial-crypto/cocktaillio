@@ -15,7 +15,10 @@ export default function AppRouteBridge(){
       const clickable=target?.closest("button,a") as HTMLElement|null;
       if(!clickable) return;
       const text=normalize(clickable.textContent||"");
-      if(text.includes("new order")){
+
+      // Counter orders stay inside the main POS for manager/cashier.
+      // Table service has its own shared waiter/cashier screen.
+      if(text==="tables"||text.includes("table management")){
         event.preventDefault();event.stopPropagation();router.push("/service");return;
       }
       if(text==="menu"||text.includes("menu management")){
