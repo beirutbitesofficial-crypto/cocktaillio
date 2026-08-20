@@ -2,7 +2,7 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { handleHardenedPosApi } from "./backend-hardening";
-import { handleServiceApi } from "./service-api";
+import { handleGuardedServiceApi } from "./service-role-guard";
 
 interface Env {
   ASSETS: Fetcher;
@@ -27,7 +27,7 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
-    const serviceResponse = await handleServiceApi(request, env, url);
+    const serviceResponse = await handleGuardedServiceApi(request, env, url);
     if (serviceResponse) return serviceResponse;
 
     const apiResponse = await handleHardenedPosApi(request, env, url);
