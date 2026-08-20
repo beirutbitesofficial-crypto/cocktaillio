@@ -1,0 +1,16 @@
+:root{
+  --sidebar:#123f2b;
+  --sidebar-muted:#b7d2c3;
+  --sidebar-active:rgba(255,255,255,.14);
+}
+:root[data-theme="dark"]{
+  --sidebar:#0b3020;
+  --sidebar-muted:#a4c0b2;
+  --sidebar-active:rgba(116,214,165,.16);
+}
+.sidebar{background:var(--sidebar)!important;color:var(--on-brand)}
+.sidebar nav button:hover,.sidebar nav button.active{background:var(--sidebar-active)!important;color:#fff}
+.nav-label,.sidebar-bottom small{color:var(--sidebar-muted)!important}
+@media(max-width:720px){
+  .sidebar{background:#123f2b!important}
+}
