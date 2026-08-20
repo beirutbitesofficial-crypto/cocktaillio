@@ -1,88 +1,16 @@
 /* Cocktaillo service POS visual layer */
 .app{min-height:100vh;background:#f3f5f2;color:#18382b;padding-bottom:max(18px,env(safe-area-inset-bottom))}
-.app header{min-height:64px!important;padding:10px 14px!important;background:#153f2d!important;display:flex!important;align-items:center!important;gap:12px!important;box-shadow:0 2px 12px rgba(18,63,43,.12);position:sticky;top:0;z-index:40}
+.app header{min-height:64px!important;padding:10px 14px!important;background:#153f2d!important;display:flex!important;align-items:center!important;gap:12px!important;box-shadow:0 2px 12px rgba(18,63,43,.12);position:sticky;top:49px!important;z-index:40}
 .app header>strong{font-size:18px!important;line-height:1.1;white-space:nowrap}
 .app nav{display:flex!important;gap:7px!important;margin-left:auto}
 .app nav a,.app header nav button{min-height:40px!important;padding:8px 11px!important;border:1px solid rgba(255,255,255,.24)!important;border-radius:10px!important;font-size:14px!important;font-weight:700!important;background:rgba(255,255,255,.06)!important;color:#fff!important}
 .app nav a:active,.app header nav button:active{background:rgba(255,255,255,.15)!important}
-
-.app .tables{padding:10px 12px!important;gap:8px!important;background:#fff;border-bottom:1px solid #dde5df;scrollbar-width:none}
-.app .tables::-webkit-scrollbar,.app .cats::-webkit-scrollbar{display:none}
-.app .tables>button{min-width:104px!important;height:62px!important;padding:8px 10px!important;border-radius:12px!important;border:1px solid #d7e1da!important;box-shadow:none!important;text-align:center!important;color:#193b2c!important;display:flex!important;flex-direction:column!important;justify-content:center!important;gap:2px!important;background:#fff!important}
-.app .tables>button strong{font-size:15px!important;line-height:1.1}
-.app .tables>button span{font-size:11px!important;color:#728078!important}
-.app .tables>button.sel{outline:none!important;border:2px solid #153f2d!important;box-shadow:0 0 0 2px rgba(21,63,45,.08)!important}
-.app .tables>button.occ{background:#edf5f0!important;border-color:#b9cebf!important}
-.app .tables>button.occ span{color:#153f2d!important;font-weight:800}
-
-.app .layout{padding:12px!important;gap:12px!important;grid-template-columns:minmax(0,1fr) 340px!important;align-items:start}
-.app .menu,.app aside{border:1px solid #dfe7e1!important;border-radius:16px!important;padding:12px!important;background:#fff!important;box-shadow:0 5px 18px rgba(23,56,43,.04)}
-.app aside{position:sticky;top:86px}
-.app aside h2{font-size:24px!important;margin:0 0 3px!important;color:#153f2d!important}
-.app aside>p{margin:0 0 12px!important;font-size:12px!important;color:#7b8980!important}
-
-.app .cats{padding:0 0 10px!important;gap:7px!important}
-.app .cats button{min-height:42px!important;padding:8px 13px!important;border-radius:10px!important;border:1px solid #d8e2db!important;background:#f8faf8!important;color:#355244!important;font-size:13px!important;font-weight:750!important;white-space:nowrap!important;outline:none!important}
-.app .cats button.active{background:#153f2d!important;color:#fff!important;border-color:#153f2d!important;box-shadow:none!important}
-
-.app .grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important}
-.app .item{min-height:82px!important;padding:10px!important;border:1px solid #dce5df!important;border-radius:11px!important;background:#fff!important;color:#18382b!important;text-align:left!important;box-shadow:none!important;position:relative!important;overflow:hidden!important}
-.app .item:hover,.app .item:active{background:#f0f6f2!important;border-color:#9fbaaa!important}
-.app .item strong{font-size:13px!important;line-height:1.15!important;color:#173b2b!important;font-weight:800!important;margin-bottom:4px!important}
-.app .item small{font-size:10px!important;line-height:1.25!important;color:#7a887f!important;display:block!important;direction:rtl!important;text-align:left!important}
-.app .item b{font-size:13px!important;color:#153f2d!important;margin-top:7px!important;font-weight:850!important}
-
-.app .lines{gap:7px!important;max-height:34vh!important;overflow:auto!important;padding-right:1px}
-.app .line{padding:9px 10px!important;border:1px solid #e1e8e3!important;border-radius:10px!important;background:#fbfcfb!important;font-size:12px!important}
-.app .line>strong{font-size:12px!important;color:#173b2b!important}
-.app .line>span{float:right;font-weight:800;color:#173b2b}
-.app .line small{font-size:10px!important;color:#79867e!important;margin-top:3px!important}
-.app .line.pending{background:#f0f6f2!important;border-color:#c9d8ce!important;align-items:center!important}
-.app .qty button{width:29px!important;height:29px!important;border-radius:8px!important;border:1px solid #ced9d1!important;background:#fff!important;color:#153f2d!important;font-weight:900!important}
-.app .qty b{min-width:20px;text-align:center}
-
-.app .primary{min-height:44px!important;border-radius:10px!important;background:#153f2d!important;color:#fff!important;font-size:13px!important;font-weight:800!important;box-shadow:none!important}
-.app aside>.primary{width:100%!important;margin-top:10px!important}
-.app .checkout{margin-top:12px!important;padding-top:10px!important;border-top:1px solid #e3eae5!important;gap:8px!important}
-.app .total{font-size:13px!important;padding:2px 0!important}
-.app .total strong{font-size:15px!important;color:#153f2d!important}
-.app .transfer select,.app .pay input{min-height:40px!important;border:1px solid #d4dfd7!important;border-radius:9px!important;background:#fff!important;padding:8px 10px!important}
-.app .transfer button{min-width:82px!important;border:0!important;border-radius:9px!important;background:#e8efea!important;color:#153f2d!important;font-weight:800!important}
-.app .pay h3{margin:3px 0!important;font-size:14px!important}
-.app .waiter{font-size:12px!important;background:#edf5f0!important;color:#315343!important;border-radius:9px!important;padding:10px!important}
-
-.app .modal{backdrop-filter:blur(4px);background:rgba(13,34,24,.55)!important;z-index:100!important}
-.app .custom,.app .receipt{border-radius:17px!important;padding:18px!important;box-shadow:0 22px 60px rgba(0,0,0,.18)!important}
-.app .custom h2,.app .receipt h2{margin-top:0;color:#153f2d}
-.app .addons{gap:7px!important}
-.app .addons button{border:1px solid #dae4dd!important;border-radius:10px!important;background:#f9fbf9!important;color:#234535!important;font-size:12px!important;font-weight:750!important}
-.app .addons button.on{background:#153f2d!important;color:#fff!important;border-color:#153f2d!important;outline:none!important}
-.app .custom textarea{border:1px solid #d5e0d8!important;border-radius:10px!important;background:#fff!important}
-
-@media(max-width:800px){
-  body{background:#f3f5f2!important}
-  .app header{min-height:58px!important;padding:8px 10px!important}
-  .app header>strong{font-size:15px!important;max-width:42vw;overflow:hidden;text-overflow:ellipsis}
-  .app nav{gap:5px!important}
-  .app nav a,.app header nav button{min-height:36px!important;padding:7px 9px!important;font-size:12px!important;border-radius:9px!important}
-  .app .tables{padding:8px 10px!important}
-  .app .tables>button{min-width:88px!important;height:54px!important;padding:6px 8px!important}
-  .app .tables>button strong{font-size:13px!important}.app .tables>button span{font-size:10px!important}
-  .app .layout{display:flex!important;flex-direction:column!important;padding:9px!important;gap:9px!important}
-  .app aside{order:0!important;position:static!important;width:100%!important;padding:11px!important}
-  .app .menu{order:1!important;width:100%!important;padding:10px!important}
-  .app aside h2{font-size:20px!important}.app aside>p{margin-bottom:6px!important}
-  .app .lines:empty{display:none}
-  .app .cats{padding-bottom:8px!important}.app .cats button{min-height:37px!important;padding:7px 10px!important;font-size:12px!important}
-  .app .grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px!important}
-  .app .item{min-height:76px!important;padding:8px!important;border-radius:10px!important}
-  .app .item strong{font-size:12px!important}.app .item small{font-size:9px!important}.app .item b{font-size:12px!important;margin-top:5px!important}
-  .app .lines{max-height:28vh!important}
-  .app .addons{grid-template-columns:repeat(2,minmax(0,1fr))!important}
-}
-
-@media(max-width:430px){
-  .app .grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
-  .app .item{min-height:72px!important}
-  .app nav a[href="/kitchen"]{display:none!important}
-}
+.app .tables{padding:10px 12px!important;gap:8px!important;background:#fff;border-bottom:1px solid #dde5df;scrollbar-width:none}.app .tables::-webkit-scrollbar,.app .cats::-webkit-scrollbar{display:none}.app .tables>button{min-width:104px!important;height:62px!important;padding:8px 10px!important;border-radius:12px!important;border:1px solid #d7e1da!important;text-align:center!important;color:#193b2c!important;display:flex!important;flex-direction:column!important;justify-content:center!important;gap:2px!important;background:#fff!important}.app .tables>button strong{font-size:15px!important}.app .tables>button span{font-size:11px!important;color:#728078!important}.app .tables>button.sel{outline:none!important;border:2px solid #153f2d!important}.app .tables>button.occ{background:#edf5f0!important;border-color:#b9cebf!important}.app .tables>button.occ span{color:#153f2d!important;font-weight:800}
+.app .layout{padding:12px!important;gap:12px!important;grid-template-columns:minmax(0,1fr) 340px!important;align-items:start}.app .menu,.app aside{border:1px solid #dfe7e1!important;border-radius:16px!important;padding:12px!important;background:#fff!important;box-shadow:0 5px 18px rgba(23,56,43,.04)}.app aside{position:sticky;top:120px}.app aside h2{font-size:24px!important;margin:0 0 3px!important;color:#153f2d!important}.app aside>p{margin:0 0 12px!important;font-size:12px!important;color:#7b8980!important}
+.app .cats{padding:0 0 10px!important;gap:7px!important}.app .cats button{min-height:42px!important;padding:8px 13px!important;border-radius:10px!important;border:1px solid #d8e2db!important;background:#f8faf8!important;color:#355244!important;font-size:13px!important;font-weight:750!important;white-space:nowrap!important;outline:none!important}.app .cats button.active{background:#153f2d!important;color:#fff!important;border-color:#153f2d!important}
+.app .grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important}.app .item{min-height:82px!important;padding:10px!important;border:1px solid #dce5df!important;border-radius:11px!important;background:#fff!important;color:#18382b!important;text-align:left!important;position:relative!important;overflow:hidden!important}.app .item:hover,.app .item:active{background:#f0f6f2!important;border-color:#9fbaaa!important}.app .item strong{font-size:13px!important;line-height:1.15!important;color:#173b2b!important;font-weight:800!important;margin-bottom:4px!important}.app .item small{font-size:10px!important;color:#7a887f!important;display:block!important;direction:rtl!important;text-align:left!important}.app .item b{font-size:13px!important;color:#153f2d!important;margin-top:7px!important;font-weight:850!important}
+.app .lines{gap:7px!important;max-height:34vh!important;overflow:auto!important}.app .line{padding:9px 10px!important;border:1px solid #e1e8e3!important;border-radius:10px!important;background:#fbfcfb!important;font-size:12px!important}.app .line>span{float:right;font-weight:800}.app .line small{font-size:10px!important;color:#79867e!important;margin-top:3px!important}.app .line.pending{background:#f0f6f2!important;border-color:#c9d8ce!important;align-items:center!important}.app .qty button{width:29px!important;height:29px!important;border-radius:8px!important;border:1px solid #ced9d1!important;background:#fff!important;color:#153f2d!important;font-weight:900!important}
+.app .primary{min-height:44px!important;border-radius:10px!important;background:#153f2d!important;color:#fff!important;border:0!important;font-size:13px!important;font-weight:800!important}.app aside>.primary{width:100%!important;margin-top:10px!important}.app .checkout{margin-top:12px!important;padding-top:10px!important;border-top:1px solid #e3eae5!important;gap:8px!important}.app .total{font-size:13px!important}.app .total strong{font-size:15px!important;color:#153f2d!important}.app .transfer select,.app .pay input{min-height:40px!important;border:1px solid #d4dfd7!important;border-radius:9px!important;padding:8px 10px!important}.app .transfer button{min-width:82px!important;border:0!important;border-radius:9px!important;background:#e8efea!important;color:#153f2d!important;font-weight:800!important}.app .waiter{font-size:12px!important;background:#edf5f0!important;color:#315343!important;border-radius:9px!important;padding:10px!important}
+.app .modal{backdrop-filter:blur(4px);background:rgba(13,34,24,.55)!important;z-index:100!important}.app .custom,.app .receipt{border-radius:17px!important;padding:18px!important}.app .addons{gap:7px!important}.app .addons button{position:relative!important;min-height:64px!important;padding:8px 8px 22px!important;border:1px solid #dae4dd!important;border-radius:10px!important;background:#f9fbf9!important;color:#234535!important;font-size:12px!important;font-weight:750!important}.app .addons button::after{position:absolute;left:8px;bottom:6px;font-size:10px;font-weight:850;color:#567064}.app .addons button:nth-child(-n+9)::after{content:"100,000 LBP"}.app .addons button:nth-child(n+10)::after{content:"80,000 LBP"}.app .addons button.on{background:#153f2d!important;color:#fff!important;border-color:#153f2d!important;outline:none!important}.app .addons button.on::after{color:#d8eadf}.app .custom textarea{border:1px solid #d5e0d8!important;border-radius:10px!important;background:#fff!important}
+@media(max-width:800px){body{background:#f3f5f2!important}.app header{min-height:58px!important;padding:8px 10px!important;top:47px!important}.app header>strong{font-size:15px!important;max-width:42vw;overflow:hidden;text-overflow:ellipsis}.app nav{gap:5px!important}.app nav a,.app header nav button{min-height:36px!important;padding:7px 9px!important;font-size:12px!important}.app .tables{padding:8px 10px!important}.app .tables>button{min-width:88px!important;height:54px!important}.app .layout{display:flex!important;flex-direction:column!important;padding:9px!important;gap:9px!important}.app aside{order:0!important;position:static!important;width:100%!important}.app .menu{order:1!important;width:100%!important}.app .cats button{min-height:37px!important;padding:7px 10px!important;font-size:12px!important}.app .grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px!important}.app .item{min-height:76px!important;padding:8px!important}.app .lines{max-height:28vh!important}.app .addons{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:430px){.app .grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.app .item{min-height:72px!important}.app nav a[href="/kitchen"]{display:none!important}}
