@@ -4,6 +4,7 @@ import "./mobile-nav.css";
 import "./brand-green.css";
 import "./service-polish.css";
 import AppRouteBridge from "./app-route-bridge";
+import GlobalModuleNav from "./global-module-nav";
 
 export const metadata: Metadata = {
   title: "Cocktaillo POS",
@@ -15,12 +16,10 @@ export const viewport: Viewport = {
   themeColor: "#123f2b",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body><AppRouteBridge />{children}</body>
+      <body><AppRouteBridge /><GlobalModuleNav />{children}</body>
     </html>
   );
 }
