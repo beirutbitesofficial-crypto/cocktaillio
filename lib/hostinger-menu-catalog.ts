@@ -1,24 +1,33 @@
+export type ProductionStation = "bar" | "kitchen";
+
 export type HostingerMenuItem = {
   id: string;
   name: string;
+  name_en: string;
+  name_ar: string;
   description: string;
   price_cents: number;
   image_url: null;
   available: 1;
   customizable: 0 | 1;
+  addons_enabled: boolean;
   category: string;
+  station: ProductionStation;
 };
 
 export const hostingerCategories = [
-  { id: "hot-dessert", name: "Hot Dessert / حلويات ساخنة", sort_order: 10 },
-  { id: "cold-dessert", name: "Cold Dessert / حلويات باردة", sort_order: 20 },
+  { id: "hot-dessert", name: "Hot Dessert / حلويات ساخنة", name_en: "Hot Dessert", name_ar: "حلويات ساخنة", station: "bar" as const, sort_order: 10 },
+  { id: "cold-dessert", name: "Cold Dessert / حلويات باردة", name_en: "Cold Dessert", name_ar: "حلويات باردة", station: "bar" as const, sort_order: 20 },
 ];
 
 const hot = "Hot Dessert / حلويات ساخنة";
 const cold = "Cold Dessert / حلويات باردة";
-const item = (id: string, name: string, price_cents: number, category: string, customizable: 0 | 1 = 0): HostingerMenuItem => ({
-  id, name, description: "", price_cents, image_url: null, available: 1, customizable, category,
-});
+const splitName = (name: string) => { const [en, ...rest] = name.split(" / "); return { en: en.trim(), ar: rest.join(" / ").trim() || en.trim() }; };
+const item = (id: string, name: string, price_cents: number, category: string, customizable: 0 | 1 = 0): HostingerMenuItem => {
+  const names = splitName(name);
+  const addonsEnabled = id.includes("crepe") || id.includes("waffle") || id.includes("pancake");
+  return { id, name, name_en: names.en, name_ar: names.ar, description: "", price_cents, image_url: null, available: 1, customizable, addons_enabled: addonsEnabled, category, station: "bar" };
+};
 
 export const hostingerMenu: HostingerMenuItem[] = [
   item("dessert-crepe-chocolate", "Crepe - Chocolate / كريب - شوكولا", 500, hot, 1),
@@ -69,33 +78,10 @@ export const hostingerMenu: HostingerMenuItem[] = [
   item("dessert-crepe-sushi", "Crepe - Sushi / كريب - سوشي", 800, hot, 1),
   item("dessert-crepe-roll", "Crepe - Roll Crepe / كريب - رول كريب", 800, hot, 1),
   item("dessert-pancake12-mix", "Pancake 12 pcs - Mix / بان كيك ١٢ قطعة - ميكس", 1000, hot, 1),
-  item("cold-jelly", "Jelly / جيلي", 100, cold),
-  item("cold-moghli", "Moghli / مغلي", 188, cold),
-  item("cold-rice-pudding", "Rice Pudding / رز بحليب", 188, cold),
-  item("cold-custard", "Custard / كاسترد", 188, cold),
-  item("cold-knafeh", "Knafeh / كنافة", 388, cold),
-  item("cold-ice-cream-1kg", "Ice Cream 1 kg / آيس كريم ١ كغ", 1800, cold),
-  item("cold-ice-cream-half-kg", "Ice Cream 1/2 kg / آيس كريم نصف كغ", 900, cold),
-  item("cold-ice-cream-1-ball", "Ice Cream 1 ball / آيس كريم كرة واحدة", 111, cold),
-  item("cold-merry-cream", "Merry Cream / ميري كريم", 200, cold),
-  item("cold-chocolate-mousse", "Chocolate Mousse / موس شوكولا", 633, cold),
+  item("cold-jelly", "Jelly / جيلي", 100, cold), item("cold-moghli", "Moghli / مغلي", 188, cold), item("cold-rice-pudding", "Rice Pudding / رز بحليب", 188, cold), item("cold-custard", "Custard / كاسترد", 188, cold), item("cold-knafeh", "Knafeh / كنافة", 388, cold), item("cold-ice-cream-1kg", "Ice Cream 1 kg / آيس كريم ١ كغ", 1800, cold), item("cold-ice-cream-half-kg", "Ice Cream 1/2 kg / آيس كريم نصف كغ", 900, cold), item("cold-ice-cream-1-ball", "Ice Cream 1 ball / آيس كريم كرة واحدة", 111, cold), item("cold-merry-cream", "Merry Cream / ميري كريم", 200, cold), item("cold-chocolate-mousse", "Chocolate Mousse / موس شوكولا", 633, cold),
 ];
 
+const addon = (id: string, name: string) => { const names = splitName(name); return { id, name, name_en: names.en, name_ar: names.ar, price_cents: 0, emoji: "✦", available: 1 }; };
 export const hostingerAddons = [
-  { id: "dessert-addon-01", name: "Nutella / نوتيلا", price_cents: 0, emoji: "✦", available: 1 },
-  { id: "dessert-addon-02", name: "Lotus / لوتس", price_cents: 0, emoji: "✦", available: 1 },
-  { id: "dessert-addon-03", name: "Ice Cream / آيس كريم", price_cents: 0, emoji: "✦", available: 1 },
-  { id: "dessert-addon-04", name: "Milka / ميلكا", price_cents: 0, emoji: "✦", available: 1 },
-  { id: "dessert-addon-05", name: "White Chocolate / شوكولا بيضاء", price_cents: 0, emoji: "✦", available: 1 },
-  { id: "dessert-addon-06", name: "Kinder / كيندر", price_cents: 0, emoji: "✦", available: 1 },
-  { id: "dessert-addon-07", name: "Oreo / أوريو", price_cents: 0, emoji: "✦", available: 1 },
-  { id: "dessert-addon-08", name: "Marshmallow / مارشميلو", price_cents: 0, emoji: "✦", available: 1 },
-  { id: "dessert-addon-09", name: "Caramel / كراميل", price_cents: 0, emoji: "✦", available: 1 },
-  { id: "dessert-addon-10", name: "Banana / موز", price_cents: 0, emoji: "✦", available: 1 },
-  { id: "dessert-addon-11", name: "Strawberry / فراولة", price_cents: 0, emoji: "✦", available: 1 },
-  { id: "dessert-addon-12", name: "Pineapple / أناناس", price_cents: 0, emoji: "✦", available: 1 },
-  { id: "dessert-addon-13", name: "Mango / مانغا", price_cents: 0, emoji: "✦", available: 1 },
-  { id: "dessert-addon-14", name: "Nuts / مكسرات", price_cents: 0, emoji: "✦", available: 1 },
-  { id: "dessert-addon-15", name: "Kiwi / كيوي", price_cents: 0, emoji: "✦", available: 1 },
-  { id: "dessert-addon-16", name: "Cotton Candy / غزل البنات", price_cents: 0, emoji: "✦", available: 1 },
+  addon("dessert-addon-01", "Nutella / نوتيلا"), addon("dessert-addon-02", "Lotus / لوتس"), addon("dessert-addon-03", "Ice Cream / آيس كريم"), addon("dessert-addon-04", "Milka / ميلكا"), addon("dessert-addon-05", "White Chocolate / شوكولا بيضاء"), addon("dessert-addon-06", "Kinder / كيندر"), addon("dessert-addon-07", "Oreo / أوريو"), addon("dessert-addon-08", "Marshmallow / مارشميلو"), addon("dessert-addon-09", "Caramel / كراميل"), addon("dessert-addon-10", "Banana / موز"), addon("dessert-addon-11", "Strawberry / فراولة"), addon("dessert-addon-12", "Pineapple / أناناس"), addon("dessert-addon-13", "Mango / مانغا"), addon("dessert-addon-14", "Nuts / مكسرات"), addon("dessert-addon-15", "Kiwi / كيوي"), addon("dessert-addon-16", "Cotton Candy / غزل البنات"),
 ];
