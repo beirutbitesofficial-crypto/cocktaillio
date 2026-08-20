@@ -1,0 +1,86 @@
+/* Mobile POS navigation hardening */
+@media (max-width: 720px) {
+  .system-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: fixed !important;
+    z-index: 100 !important;
+    inset: auto 0 0 0 !important;
+    width: 100% !important;
+    height: calc(76px + env(safe-area-inset-bottom)) !important;
+    padding: 7px 8px calc(7px + env(safe-area-inset-bottom)) !important;
+    background: var(--sidebar, #123f2b) !important;
+    box-shadow: 0 -8px 24px rgba(0,0,0,.18);
+  }
+
+  .side-brand,
+  .nav-label,
+  .sidebar-bottom {
+    display: none !important;
+  }
+
+  .sidebar nav {
+    width: 100%;
+    height: 62px;
+    display: flex !important;
+    align-items: stretch;
+    justify-content: flex-start !important;
+    gap: 4px;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .sidebar nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sidebar nav button,
+  .sidebar nav button:nth-child(n+5) {
+    display: flex !important;
+    flex: 0 0 78px !important;
+    width: 78px !important;
+    min-width: 78px !important;
+    height: 58px !important;
+    padding: 4px 5px !important;
+    border-radius: 11px !important;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    scroll-snap-align: start;
+    text-align: center;
+  }
+
+  .sidebar nav button.active {
+    background: rgba(255,255,255,.16) !important;
+  }
+
+  .sidebar nav i {
+    font-size: 17px !important;
+    line-height: 1;
+  }
+
+  .sidebar nav span {
+    display: block !important;
+    max-width: 72px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 8px !important;
+    line-height: 1.15;
+  }
+
+  .sidebar nav b {
+    display: none !important;
+  }
+
+  .content-area {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  }
+}
