@@ -1578,13 +1578,13 @@ export default function Home() {
 
   async function uploadMenuImage(file: File | undefined) {
     if (!file) return;
-    if (!/^(image\/jpeg|image\/png|image\/webp)$/.test(file.type) || file.size > 750 * 1024) {
-      setMenuFormError(tr("Choose a JPG, PNG or WebP image smaller than 750 KB.", "اختر صورة JPG أو PNG أو WebP أصغر من 750 كيلوبايت.")); return;
+    if (!/^(image\/jpeg|image\/png|image\/webp)$/.test(file.type)) {
+      setMenuFormError(tr("Choose a JPG, PNG or WebP image.", "اختر صورة JPG أو PNG أو WebP.")); return;
     }
     setMenuImageUploading(true); setMenuFormError("");
     try {
-      const image = await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error("Image upload failed."));reader.readAsDataURL(file);});
-      setMenuItemForm((current) => ({ ...current, image }));
+      const result=await posApi<{url:string}>("/api/uploads/menu-image",{method:"POST",headers:{"Content-Type":file.type},body:file});
+      setMenuItemForm((current) => ({ ...current, image:result.url }));
     } catch (error) {
       setMenuFormError(error instanceof Error ? error.message : tr("Image upload failed.", "فشل رفع الصورة."));
     } finally { setMenuImageUploading(false); }
