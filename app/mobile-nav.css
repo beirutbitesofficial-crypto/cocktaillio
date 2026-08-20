@@ -11,7 +11,8 @@
     width: 100% !important;
     height: calc(76px + env(safe-area-inset-bottom)) !important;
     padding: 7px 8px calc(7px + env(safe-area-inset-bottom)) !important;
-    background: var(--sidebar, #123f2b) !important;
+    background: #123f2b !important;
+    color: #fff !important;
     box-shadow: 0 -8px 24px rgba(0,0,0,.18);
   }
 
@@ -55,6 +56,8 @@
     gap: 2px;
     scroll-snap-align: start;
     text-align: center;
+    color: #fff !important;
+    background: transparent !important;
   }
 
   .sidebar nav button.active {
