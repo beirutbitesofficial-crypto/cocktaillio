@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./mobile-nav.css";
 import "./brand-green.css";
+import AppRouteBridge from "./app-route-bridge";
 
 export const metadata: Metadata = {
   title: "Cocktaillo POS",
@@ -18,7 +19,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body><AppRouteBridge />{children}</body>
     </html>
   );
 }
