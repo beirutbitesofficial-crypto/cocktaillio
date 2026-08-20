@@ -1,13 +1,18 @@
 "use client";
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { clearSessionToken, hasBackendConfig, posApi, saveSessionToken, type BackendBootstrap } from "@/lib/pos-api-client";
 
 type Role = "manager" | "cashier";
 type Currency = "USD" | "LBP";
 type Language = "en" | "ar";
-type View = "dashboard" | "pos" | "kitchen" | "tables" | "shift" | "inventory" | "menu" | "expenses" | "users" | "reports" | "settings";
+type View = "dashboard" | "pos" | "tables" | "shift" | "inventory" | "menu" | "expenses" | "users" | "reports" | "settings";
 type TableStatus = "available" | "occupied" | "reserved";
-type RestaurantTable = { number: number; seats: number; status: TableStatus; order?: string; total?: number };
+type RestaurantTable = { number: number; seats: number; currentGuests?: number; status: TableStatus; order?: string; total?: number };
+type ReservationStatus = "upcoming" | "seated" | "completed" | "cancelled" | "no-show";
+type Reservation = { id: string; customerName: string; guests: number; tableNumber: number; date: string; time: string; phone: string; notes: string; status: ReservationStatus };
+type TableEditor = { number: number; capacity: string; guests: string; status: TableStatus } | null;
+type ReservationForm = { customerName: string; guests: string; tableNumber: string; date: string; time: string; phone: string; notes: string };
 type CounterOrderType = "Dine-in" | "Takeaway" | "Delivery";
 type OrderType = CounterOrderType;
 type MenuCategory = "Burger sandwich" | "Sandwich" | "Appetizers" | "Salad" | "Platter";
@@ -68,9 +73,10 @@ type Expense = {
   amount: number;
   date: string;
   addedBy: string;
+  paidFrom: "cash_drawer" | "owner";
 };
 type ExpenseEditor = { mode: "add" | "edit"; id: string | null } | null;
-type ExpenseFormState = { item: string; category: ExpenseCategory; amount: string; date: string };
+type ExpenseFormState = { item: string; category: ExpenseCategory; amount: string; date: string; paidFrom: "cash_drawer" | "owner" };
 type InventoryUnit = "g" | "kg" | "ml" | "L" | "item" | "box";
 type InventoryItem = {
   id: string;
@@ -169,10 +175,10 @@ const initialToppings: Topping[] = [
 const menuCategories: MenuCategory[] = ["Burger sandwich", "Sandwich", "Appetizers", "Salad", "Platter"];
 const expenseCategories: ExpenseCategory[] = ["Electricity", "Salary", "Internet", "Rent", "Supplies", "Other"];
 const initialExpenses: Expense[] = [
-  { id: "expense-electricity", item: "Electricity bill", category: "Electricity", amount: 186, date: "2026-07-29", addedBy: "Alex Daher" },
-  { id: "expense-salaries", item: "Employee salaries", category: "Salary", amount: 1250, date: "2026-07-29", addedBy: "Alex Daher" },
-  { id: "expense-internet", item: "Internet subscription", category: "Internet", amount: 45, date: "2026-07-28", addedBy: "Alex Daher" },
-  { id: "expense-cleaning", item: "Cleaning products", category: "Other", amount: 29.5, date: "2026-07-28", addedBy: "Alex Daher" },
+  { id: "expense-electricity", item: "Electricity bill", category: "Electricity", amount: 186, date: "2026-07-29", addedBy: "Alex Daher", paidFrom: "owner" },
+  { id: "expense-salaries", item: "Employee salaries", category: "Salary", amount: 1250, date: "2026-07-29", addedBy: "Alex Daher", paidFrom: "owner" },
+  { id: "expense-internet", item: "Internet subscription", category: "Internet", amount: 45, date: "2026-07-28", addedBy: "Alex Daher", paidFrom: "cash_drawer" },
+  { id: "expense-cleaning", item: "Cleaning products", category: "Other", amount: 29.5, date: "2026-07-28", addedBy: "Alex Daher", paidFrom: "cash_drawer" },
 ];
 const initialRecentOrders: RecentOrder[] = [
   { number: "#1042", type: "Table 1", cashier: "Jamie D.", time: "8:42 PM", status: "Preparing", total: 24 },
@@ -213,7 +219,6 @@ const initialKitchenOrders: KitchenOrder[] = [
 const nav: { id: View; label: string; icon: string; manager: boolean; badge?: string }[] = [
   { id: "dashboard", label: "Dashboard", icon: "⌂", manager: true },
   { id: "pos", label: "New order", icon: "＋", manager: false },
-  { id: "kitchen", label: "Kitchen display", icon: "▤", manager: false },
   { id: "tables", label: "Tables", icon: "▦", manager: false },
   { id: "shift", label: "My shift", icon: "◷", manager: false },
   { id: "inventory", label: "Inventory", icon: "□", manager: true },
@@ -225,7 +230,7 @@ const nav: { id: View; label: string; icon: string; manager: boolean; badge?: st
 ];
 
 const arabicNav: Record<View, string> = {
-  dashboard: "لوحة التحكم", pos: "طلب جديد", kitchen: "شاشة المطبخ", tables: "الطاولات", shift: "الدوام",
+  dashboard: "لوحة التحكم", pos: "طلب جديد", tables: "الطاولات", shift: "الدوام",
   inventory: "المخزون", menu: "قائمة الطعام", expenses: "المصاريف", users: "لوحة الإدارة",
   reports: "التقارير", settings: "الإعدادات",
 };
@@ -262,7 +267,7 @@ const emptyToppingForm: ToppingFormState = {
   emoji: "✦",
   available: true,
 };
-const emptyExpenseForm: ExpenseFormState = { item: "", category: "Other", amount: "", date: "" };
+const emptyExpenseForm: ExpenseFormState = { item: "", category: "Other", amount: "", date: "", paidFrom: "owner" };
 const emptyInventoryForm: InventoryFormState = { item: "", category: "", stock: "", unit: "g", min: "", cost: "" };
 
 const userStorageKey = "cocktailliio-users-v1";
@@ -273,11 +278,13 @@ const inventoryStorageKey = "cocktailliio-inventory-v1";
 const salesStorageKey = "cocktailliio-sales-v1";
 const tablesStorageKey = "cocktailliio-tables-v1";
 const kitchenStorageKey = "cocktailliio-kitchen-v1";
+const reservationStorageKey = "cocktailliio-reservations-v1";
 const printerStorageKey = "cocktailliio-printer-settings-v1";
 const defaultPrinterSettings: PrinterSettings = {
   serviceUrl: "http://127.0.0.1:17891", token: "", autoPrint: true, autoOpenDrawer: true,
   printerName: "", paperWidth: 80, copies: 1, drawerPin: 0, openDrawerAllPayments: false,
 };
+const emptyReservationForm: ReservationForm = { customerName: "", guests: "", tableNumber: "", date: "", time: "", phone: "", notes: "" };
 
 function getTodayInputValue() {
   const now = new Date();
@@ -387,7 +394,8 @@ function isExpense(value: unknown): value is Expense {
     && expense.amount >= 0
     && typeof expense.date === "string"
     && /^\d{4}-\d{2}-\d{2}$/.test(expense.date)
-    && typeof expense.addedBy === "string";
+    && typeof expense.addedBy === "string"
+    && (expense.paidFrom === undefined || expense.paidFrom === "cash_drawer" || expense.paidFrom === "owner");
 }
 
 function isInventoryItem(value: unknown): value is InventoryItem {
@@ -433,9 +441,23 @@ function isRestaurantTable(value: unknown): value is RestaurantTable {
     && typeof table.seats === "number"
     && Number.isInteger(table.seats)
     && table.seats > 0
+    && (table.currentGuests === undefined || (typeof table.currentGuests === "number" && Number.isInteger(table.currentGuests) && table.currentGuests >= 0 && table.currentGuests <= table.seats))
     && (table.status === "available" || table.status === "occupied" || table.status === "reserved")
     && (table.order === undefined || typeof table.order === "string")
     && (table.total === undefined || (typeof table.total === "number" && Number.isFinite(table.total) && table.total >= 0));
+}
+
+function isReservation(value: unknown): value is Reservation {
+  if (!value || typeof value !== "object") return false;
+  const reservation = value as Record<string, unknown>;
+  return typeof reservation.id === "string"
+    && typeof reservation.customerName === "string"
+    && typeof reservation.guests === "number" && Number.isInteger(reservation.guests) && reservation.guests > 0
+    && typeof reservation.tableNumber === "number" && Number.isInteger(reservation.tableNumber)
+    && typeof reservation.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(reservation.date)
+    && typeof reservation.time === "string" && /^\d{2}:\d{2}$/.test(reservation.time)
+    && typeof reservation.phone === "string" && typeof reservation.notes === "string"
+    && (reservation.status === "upcoming" || reservation.status === "seated" || reservation.status === "completed" || reservation.status === "cancelled" || reservation.status === "no-show");
 }
 
 function isKitchenOrder(value: unknown): value is KitchenOrder {
@@ -521,6 +543,7 @@ export default function Home() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
+  const [backendBusy, setBackendBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [userEditor, setUserEditor] = useState<UserEditor>(null);
   const [userForm, setUserForm] = useState<UserFormState>(emptyUserForm);
@@ -537,6 +560,7 @@ export default function Home() {
   const [menuItemForm, setMenuItemForm] = useState<MenuItemFormState>(emptyMenuItemForm);
   const [toppingForm, setToppingForm] = useState<ToppingFormState>(emptyToppingForm);
   const [menuFormError, setMenuFormError] = useState("");
+  const [menuImageUploading, setMenuImageUploading] = useState(false);
   const [menuDeleteConfirmation, setMenuDeleteConfirmation] = useState<MenuDeleteConfirmation>(null);
   const [view, setView] = useState<View>("dashboard");
   const [dark, setDark] = useState(false);
@@ -550,6 +574,13 @@ export default function Home() {
   const [shiftOpenedBy, setShiftOpenedBy] = useState("");
   const [tables, setTables] = useState(initialTables);
   const [tablesReady, setTablesReady] = useState(false);
+  const [tableEditor, setTableEditor] = useState<TableEditor>(null);
+  const [tableFormError, setTableFormError] = useState("");
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [reservationsReady, setReservationsReady] = useState(false);
+  const [reservationEditorOpen, setReservationEditorOpen] = useState(false);
+  const [reservationForm, setReservationForm] = useState<ReservationForm>(emptyReservationForm);
+  const [reservationFormError, setReservationFormError] = useState("");
   const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
   const [inventoryReady, setInventoryReady] = useState(false);
   const [inventoryEditor, setInventoryEditor] = useState<InventoryEditor>(null);
@@ -577,6 +608,7 @@ export default function Home() {
   const [salesReady, setSalesReady] = useState(false);
   const [notice, setNotice] = useState("");
   const [factoryResetOpen, setFactoryResetOpen] = useState(false);
+  const [factoryResetConfirmation, setFactoryResetConfirmation] = useState("");
   const [kitchenOrders, setKitchenOrders] = useState<KitchenOrder[]>(initialKitchenOrders);
   const [kitchenReady, setKitchenReady] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
@@ -716,6 +748,16 @@ export default function Home() {
     if (!tablesReady) return;
     localStorage.setItem(tablesStorageKey, JSON.stringify(tables));
   }, [tables, tablesReady]);
+
+  useEffect(() => {
+    setReservations(parseStoredCollection(localStorage.getItem(reservationStorageKey), isReservation) ?? []);
+    setReservationsReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!reservationsReady) return;
+    localStorage.setItem(reservationStorageKey, JSON.stringify(reservations));
+  }, [reservations, reservationsReady]);
 
   useEffect(() => {
     const savedKitchenOrders = parseOperationalCollection(localStorage.getItem(kitchenStorageKey), isKitchenOrder);
@@ -979,6 +1021,7 @@ export default function Home() {
       category: expense.category,
       amount: displayedAmount,
       date: expense.date,
+      paidFrom: expense.paidFrom ?? "owner",
     });
     setExpenseFormError("");
     setExpenseEditor({ mode: "edit", id: expense.id });
@@ -990,7 +1033,7 @@ export default function Home() {
     setExpenseFormError("");
   }
 
-  function submitExpense(event: FormEvent<HTMLFormElement>) {
+  async function submitExpense(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!expenseEditor) return;
     const item = expenseForm.item.trim().replace(/\s+/g, " ");
@@ -1011,15 +1054,27 @@ export default function Home() {
       setExpenseFormError(tr("Choose a valid expense date.", "اختر تاريخاً صحيحاً للمصروف."));
       return;
     }
+    if (expenseForm.paidFrom === "cash_drawer" && !shiftOpen) {
+      setExpenseFormError(tr("Open a shift before recording a cash drawer expense.", "افتح الدوام قبل تسجيل مصروف من صندوق النقد."));
+      return;
+    }
 
     const amount = currency === "LBP" ? enteredAmount / exchangeRate : enteredAmount;
+    let persistedId: string | null = null;
+    if (hasBackendConfig() && !existing) {
+      try {
+        const result = await posApi<{ id: string }>("/api/expenses", { method: "POST", body: JSON.stringify({ description: item, category: expenseForm.category, amountCents: Math.round(amount * 100), paidFrom: expenseForm.paidFrom, expenseDate: expenseForm.date }) });
+        persistedId = result.id;
+      } catch (error) { setExpenseFormError(error instanceof Error ? error.message : tr("Could not save expense.", "تعذر حفظ المصروف.")); return; }
+    }
     const nextExpense: Expense = {
-      id: existing?.id ?? crypto.randomUUID(),
+      id: existing?.id ?? persistedId ?? crypto.randomUUID(),
       item,
       category: expenseForm.category,
       amount,
       date: expenseForm.date,
       addedBy: existing?.addedBy ?? currentUser?.name ?? "Cocktailliio",
+      paidFrom: expenseForm.paidFrom,
     };
     setExpenses((current) => existing
       ? current.map((expense) => expense.id === existing.id ? nextExpense : expense)
@@ -1148,8 +1203,12 @@ export default function Home() {
     closeRestock();
   }
 
-  function toggleShift() {
+  async function toggleShift() {
     if (shiftOpen) {
+      if (hasBackendConfig()) {
+        try { await posApi("/api/shifts/close", { method: "POST", body: JSON.stringify({ closingCashCents: Math.round((openingCash ?? 0) * 100) }) }); }
+        catch (error) { showNotice(error instanceof Error ? error.message : tr("Could not close shift", "تعذر إغلاق الدوام")); return; }
+      }
       setShiftOpen(false);
       setOpeningCash(null);
       setOpeningCashInput("");
@@ -1164,7 +1223,12 @@ export default function Home() {
       showNotice(tr("Enter a valid opening cash amount", "أدخل مبلغًا صحيحًا"));
       return;
     }
-    setOpeningCash(currency === "LBP" ? amount / exchangeRate : amount);
+    const openingAmount = currency === "LBP" ? amount / exchangeRate : amount;
+    if (hasBackendConfig()) {
+      try { await posApi("/api/shifts/open", { method: "POST", body: JSON.stringify({ openingCashCents: Math.round(openingAmount * 100) }) }); }
+      catch (error) { showNotice(error instanceof Error ? error.message : tr("Could not open shift", "تعذر فتح الدوام")); return; }
+    }
+    setOpeningCash(openingAmount);
     setShiftOpen(true);
     setShiftStartedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
     setShiftOpenedBy(currentUser?.name ?? tr("Current user", "المستخدم الحالي"));
@@ -1177,10 +1241,10 @@ export default function Home() {
     const cell = (value: string | number, type = "String", style = "") => `<Cell${style ? ` ss:StyleID="${style}"` : ""}><Data ss:Type="${type}">${esc(value)}</Data></Cell>`;
     const row = (values: (string | number)[], header = false) => `<Row>${values.map((value) => cell(value, typeof value === "number" ? "Number" : "String", header ? "Header" : "")).join("")}</Row>`;
     const expenseTotal = expenses.reduce((sum, expense) => sum + expense.amount, 0);
-    const sales = period === "Daily" ? salesTotal : period === "Monthly" ? 34680 : 392440;
+    const sales = salesTotal;
     const xml = `<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
       <Styles><Style ss:ID="Default"><Alignment ss:Vertical="Center"/><Font ss:FontName="Arial" ss:Size="10"/></Style><Style ss:ID="Header"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#921414" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center"/></Style><Style ss:ID="Title"><Font ss:Bold="1" ss:Size="18" ss:Color="#921414"/></Style></Styles>
-      <Worksheet ss:Name="Summary"><Table><Column ss:Width="180"/><Column ss:Width="130"/><Row ss:Height="30">${cell(`Cocktailliio ${period} Report`, "String", "Title")}</Row>${row(["Generated", new Date().toLocaleString()])}${row(["Period", period])}${row(["Gross sales (USD)", sales])}${row(["Expenses (USD)", expenseTotal])}${row(["Estimated net (USD)", sales - expenseTotal])}${row(["Orders", period === "Daily" ? orders : period === "Monthly" ? 1146 : 13204])}</Table></Worksheet>
+      <Worksheet ss:Name="Summary"><Table><Column ss:Width="180"/><Column ss:Width="130"/><Row ss:Height="30">${cell(`Cocktailliio ${period} Report`, "String", "Title")}</Row>${row(["Generated", new Date().toLocaleString()])}${row(["Period", period])}${row(["Gross sales (USD)", sales])}${row(["Expenses (USD)", expenseTotal])}${row(["Cash drawer expenses (USD)", expenses.filter((expense) => (expense.paidFrom ?? "owner") === "cash_drawer").reduce((sum, expense) => sum + expense.amount, 0)])}${row(["Owner-paid expenses (USD)", expenses.filter((expense) => (expense.paidFrom ?? "owner") === "owner").reduce((sum, expense) => sum + expense.amount, 0)])}${row(["Estimated net (USD)", sales - expenseTotal])}${row(["Orders", orders])}</Table></Worksheet>
       <Worksheet ss:Name="Expenses"><Table><Column ss:Width="190"/><Column ss:Width="110"/><Column ss:Width="100"/><Column ss:Width="130"/><Column ss:Width="100"/>${row(["Description","Category","Date","Added by","Amount USD"], true)}${expenses.map((expense) => row([expense.item,expense.category,expense.date,expense.addedBy,expense.amount])).join("")}${row(["TOTAL","","","",expenseTotal], true)}</Table></Worksheet>
       <Worksheet ss:Name="Inventory"><Table><Column ss:Width="170"/><Column ss:Width="110"/><Column ss:Width="80"/><Column ss:Width="70"/><Column ss:Width="90"/><Column ss:Width="90"/><Column ss:Width="100"/><Column ss:Width="100"/>${row(["Item","Category","Quantity","Unit","Alert at","Status","Cost per unit USD","Stock value USD"], true)}${inventory.map((item) => row([item.item,item.category,item.stock,item.unit,item.min,item.stock <= item.min ? "LOW STOCK" : "In stock",item.cost,item.stock * item.cost])).join("")}</Table></Worksheet>
       <Worksheet ss:Name="Menu"><Table><Column ss:Width="180"/><Column ss:Width="100"/><Column ss:Width="100"/><Column ss:Width="110"/><Column ss:Width="110"/>${row(["Menu item","Category","Price USD","Availability","Customizable"], true)}${menuItems.map((item) => row([item.name,item.category,item.price,item.available ? "Available" : "Hidden",item.customizable ? "Yes" : "No"])).join("")}</Table></Worksheet>
@@ -1196,9 +1260,50 @@ export default function Home() {
     showNotice(`${period} Excel report exported`);
   }
 
-  function handleLogin(event: FormEvent<HTMLFormElement>) {
+  function applyBackend(data: BackendBootstrap) {
+    const backendRole: Role = data.user.role === "cashier" ? "cashier" : "manager";
+    const signedIn: UserAccount = { id: data.user.id, username: data.user.username, password: "", name: data.user.name, initials: makeInitials(data.user.name), role: backendRole, active: true };
+    setAccounts((current) => [signedIn, ...current.filter((entry) => entry.id !== signedIn.id)]);
+    setCurrentUserId(signedIn.id);
+    setMenuItems(data.menu.map((item) => ({ id: item.id, name: item.name, description: item.description, price: item.price_cents / 100, image: item.image_url ?? "", category: item.category as MenuCategory, available: Boolean(item.available), customizable: Boolean(item.customizable) })));
+    setToppings(data.addons.map((item) => ({ id: item.id, name: item.name, price: item.price_cents / 100, emoji: item.emoji, available: Boolean(item.available) })));
+    setInventory(data.inventory.map((item) => ({ id: item.id, item: item.name, category: item.category, stock: item.quantity_base, unit: (item.display_unit === "piece" ? "item" : item.display_unit === "pack" ? "box" : item.display_unit) as InventoryUnit, min: item.alert_quantity_base, cost: item.cost_micros_per_base / 1_000_000 })));
+    setTables(data.tables.map((table) => ({ number: Number(table.name.match(/\d+/)?.[0] ?? table.id.match(/\d+/)?.[0] ?? 0), seats: table.capacity, currentGuests: table.current_guests, status: table.status as TableStatus })));
+    setReservations(data.reservations.map((raw) => {
+      const reservation = raw as { id: string; customer_name: string; guest_count: number; table_id: string; starts_at: string; phone?: string | null; notes?: string | null; status: string };
+      const start = new Date(reservation.starts_at);
+      return { id: reservation.id, customerName: reservation.customer_name, guests: reservation.guest_count, tableNumber: Number(reservation.table_id.match(/\d+/)?.[0] ?? 0), date: start.toISOString().slice(0, 10), time: start.toTimeString().slice(0, 5), phone: reservation.phone ?? "", notes: reservation.notes ?? "", status: reservation.status.replace("_", "-") as ReservationStatus };
+    }));
+    setExpenses(data.expenses.map((expense) => ({ id: expense.id, item: expense.description, category: expense.category as ExpenseCategory, amount: expense.amount_cents / 100, date: expense.expense_date, addedBy: expense.added_by, paidFrom: expense.paid_from })));
+    setShiftOpen(Boolean(data.shift));
+    setOpeningCash(data.shift ? data.shift.opening_cash_cents / 100 : null);
+    setShiftStartedAt(data.shift?.opened_at ?? "");
+    setShiftOpenedBy(data.shift ? data.user.name : "");
+    setSalesTotal((data.metrics?.sales_cents ?? 0) / 100);
+    setOrders(data.metrics?.orders ?? 0);
+    setNextOrderNumber(data.metrics?.next_order_number ?? 1);
+    setRecentOrders(data.recentOrders.map((order) => ({ number: `#${order.order_number}`, type: order.order_type.replace("_", " "), cashier: order.cashier, time: new Date(order.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }), status: order.status === "finalized" ? "Paid" : "Preparing", total: order.total_cents / 100 })));
+    setView(backendRole === "manager" ? "dashboard" : data.shift ? "pos" : "shift");
+  }
+
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!accountsReady) return;
+    if (hasBackendConfig()) {
+      setBackendBusy(true); setLoginError("");
+      try {
+        const login = await posApi<{ token: string }>("/api/auth/login", { method: "POST", body: JSON.stringify({ username: loginForm.username.trim(), password: loginForm.password }) });
+        saveSessionToken(login.token);
+        const bootstrap = await posApi<BackendBootstrap>("/api/bootstrap");
+        applyBackend(bootstrap);
+        setLoginForm({ username: "", password: "" }); setShowPassword(false);
+        showNotice(tr("Signed in securely", "تم تسجيل الدخول بأمان"));
+      } catch (error) {
+        clearSessionToken();
+        setLoginError(error instanceof Error ? error.message : tr("Could not sign in.", "تعذر تسجيل الدخول."));
+      } finally { setBackendBusy(false); }
+      return;
+    }
     const username = loginForm.username.trim().toLowerCase();
     const account = accounts.find((user) => (
       user.active
@@ -1226,6 +1331,7 @@ export default function Home() {
       return;
     }
     setCurrentUserId(null);
+    clearSessionToken();
     setView("dashboard");
     setLoginForm({ username: "", password: "" });
     setLoginError("");
@@ -1459,6 +1565,22 @@ export default function Home() {
     setMenuFormError("");
   }
 
+  async function uploadMenuImage(file: File | undefined) {
+    if (!file) return;
+    if (!/^(image\/jpeg|image\/png|image\/webp)$/.test(file.type) || file.size > 5 * 1024 * 1024) {
+      setMenuFormError(tr("Choose a JPG, PNG or WebP image smaller than 5 MB.", "اختر صورة JPG أو PNG أو WebP أصغر من 5 ميغابايت.")); return;
+    }
+    setMenuImageUploading(true); setMenuFormError("");
+    try {
+      const response = await fetch("/api/uploads/menu-image", { method: "POST", headers: { "Content-Type": file.type }, body: file });
+      const result = await response.json() as { url?: string; error?: string };
+      if (!response.ok || !result.url) throw new Error(result.error ?? "Image upload failed.");
+      setMenuItemForm((current) => ({ ...current, image: result.url! }));
+    } catch (error) {
+      setMenuFormError(error instanceof Error ? error.message : tr("Image upload failed.", "فشل رفع الصورة."));
+    } finally { setMenuImageUploading(false); }
+  }
+
   function submitMenuEntry(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!menuEditor) return;
@@ -1587,23 +1709,25 @@ export default function Home() {
     setView(next);
   }
 
-  function performFactoryReset() {
-    const cleanTables = initialTables.map(({ number, seats }) => ({ number, seats, status: "available" as const }));
+  async function performFactoryReset() {
+    if (factoryResetConfirmation !== "RESET") return;
+    if (hasBackendConfig()) {
+      try { await posApi("/api/admin/factory-reset", { method: "POST", body: JSON.stringify({ confirmation: factoryResetConfirmation }) }); }
+      catch (error) { showNotice(error instanceof Error ? error.message : tr("Factory reset failed.", "فشلت إعادة الضبط.")); return; }
+    }
+    const cleanTables = tables.map(({ number, seats }) => ({ number, seats, currentGuests: 0, status: "available" as const }));
 
-    localStorage.setItem(userStorageKey, JSON.stringify(initialUserAccounts));
     localStorage.setItem(expenseStorageKey, JSON.stringify([]));
-    localStorage.setItem(inventoryStorageKey, JSON.stringify([]));
+    localStorage.setItem(inventoryStorageKey, JSON.stringify(inventory.map((item) => ({ ...item, stock: 0 }))));
     localStorage.setItem(salesStorageKey, JSON.stringify({ salesTotal: 0, orders: 0, nextOrderNumber: 1, recentOrders: [] } satisfies SalesSnapshot));
     localStorage.setItem(tablesStorageKey, JSON.stringify(cleanTables));
     localStorage.setItem(kitchenStorageKey, JSON.stringify([]));
-    localStorage.removeItem("cocktailliio-theme");
-    localStorage.removeItem("cocktailliio-currency");
-    localStorage.removeItem("cocktailliio-language");
+    localStorage.setItem(reservationStorageKey, JSON.stringify([]));
 
-    setAccounts(initialUserAccounts);
     setExpenses([]);
-    setInventory([]);
+    setInventory((current) => current.map((item) => ({ ...item, stock: 0 })));
     setTables(cleanTables);
+    setReservations([]);
     setKitchenOrders([]);
     setReceipt(null);
     setReceiptPreviewOpen(false);
@@ -1623,16 +1747,10 @@ export default function Home() {
     setOrders(0);
     setSalesTotal(0);
     setRecentOrders([]);
-    setDark(false);
-    setCurrency("USD");
-    setLanguage("en");
-    setExchangeRate(89500);
     setFactoryResetOpen(false);
+    setFactoryResetConfirmation("");
     setView("dashboard");
-    setCurrentUserId(null);
-    setLoginForm({ username: "", password: "" });
-    setLoginError("");
-    showNotice("Factory reset complete — menu items and toppings were preserved");
+    showNotice("Factory reset complete — master data and settings were preserved");
   }
 
   const lowStock = inventory.filter((item) => item.stock <= item.min);
@@ -1640,6 +1758,8 @@ export default function Home() {
   const todayKey = getTodayInputValue();
   const todayExpenses = expenses.filter((expense) => expense.date === todayKey);
   const monthExpenses = expenses.filter((expense) => expense.date.startsWith(todayKey.slice(0, 7)));
+  const cashDrawerExpenses = expenses.filter((expense) => (expense.paidFrom ?? "owner") === "cash_drawer");
+  const ownerExpenses = expenses.filter((expense) => (expense.paidFrom ?? "owner") === "owner");
   const topExpenseCategory = expenseCategories
     .map((category) => ({ category, total: expenses.filter((expense) => expense.category === category).reduce((sum, expense) => sum + expense.amount, 0) }))
     .sort((a, b) => b.total - a.total)[0]?.category ?? "Other";
@@ -1660,7 +1780,7 @@ export default function Home() {
     || (counterOrderType === "Takeaway" && Boolean(contactName && contactPhone))
     || (counterOrderType === "Delivery" && Boolean(contactName && contactPhone && contactAddress));
 
-  function completeOrder(item: MenuItem, chosenToppings: Topping[]) {
+  async function completeOrder(item: MenuItem, chosenToppings: Topping[]) {
     if (!counterOrderType || completionLock.current) return;
     const cheeseAddOns = chosenToppings.filter((topping) => topping.price > 0);
     const total = item.price + cheeseAddOns.reduce((sum, topping) => sum + topping.price, 0);
@@ -1670,7 +1790,30 @@ export default function Home() {
       return;
     }
     completionLock.current = true;
-    const number = `#${nextOrderNumber}`;
+    let persistedOrder: { orderNumber: number; totalCents: number } | null = null;
+    if (hasBackendConfig()) {
+      try {
+        const result = await posApi<{ order: { orderNumber: number; totalCents: number } }>("/api/orders/finalize", {
+          method: "POST",
+          headers: { "Idempotency-Key": crypto.randomUUID() },
+          body: JSON.stringify({
+            orderType: counterOrderType === "Dine-in" ? "dine_in" : counterOrderType.toLowerCase(),
+            tableId: counterOrderType === "Dine-in" && counterTable !== null ? `table-${counterTable}` : null,
+            paymentMethod: paymentMethod.toLowerCase(), cashReceivedCents: Math.round(enteredCash * 100),
+            customerName: contactName || undefined, customerPhone: contactPhone || undefined,
+            deliveryAddress: contactAddress || undefined, driverName: orderContact.driver.trim() || undefined,
+            items: [{ menuItemId: item.id, quantity: 1, addonIds: chosenToppings.map((topping) => topping.id) }],
+          }),
+        });
+        persistedOrder = result.order;
+      } catch (error) {
+        completionLock.current = false;
+        showNotice(error instanceof Error ? error.message : tr("Order could not be finalized.", "تعذر إنهاء الطلب."));
+        return;
+      }
+    }
+    const confirmedOrderNumber = persistedOrder?.orderNumber ?? nextOrderNumber;
+    const number = `#${confirmedOrderNumber}`;
     const now = new Date();
     const receiptLines: ReceiptLine[] = [
       { name: item.name, quantity: 1, price: item.price },
@@ -1680,7 +1823,7 @@ export default function Home() {
     const customizationNotes = chosenToppings.map((topping) => topping.price > 0 ? `${topping.name} (+${money(topping.price)})` : topping.name);
     const kitchenCustomer = counterOrderType === "Dine-in" && counterTable !== null ? `Table ${counterTable}` : `${counterOrderType} · ${contactName}`;
     const kitchenOrder: KitchenOrder = {
-      id: nextOrderNumber, number, type: counterOrderType,
+      id: confirmedOrderNumber, number, type: counterOrderType,
       items: [item.name, ...customizationNotes.map((name) => `+ ${name}`)],
       status: "pending", time: now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }), customer: kitchenCustomer,
     };
@@ -1707,7 +1850,7 @@ export default function Home() {
       ? tables.map((table) => table.number === counterTable ? { ...table, status: "occupied" as const, order: number, total } : table)
       : tables;
     const nextSales: SalesSnapshot = {
-      salesTotal: salesTotal + total, orders: orders + 1, nextOrderNumber: nextOrderNumber + 1, recentOrders: nextRecentOrders,
+      salesTotal: salesTotal + total, orders: orders + 1, nextOrderNumber: confirmedOrderNumber + 1, recentOrders: nextRecentOrders,
     };
 
     try {
@@ -1819,11 +1962,69 @@ export default function Home() {
   }
 
   function updateTable(number: number) {
-    setTables((current) => current.map((table) => {
-      if (table.number !== number) return table;
-      const next: TableStatus = table.status === "available" ? "occupied" : table.status === "occupied" ? "reserved" : "available";
-      return { ...table, status: next, order: next === "occupied" ? `#${1040 + number}` : undefined, total: next === "occupied" ? 18.5 : undefined };
-    }));
+    const table = tables.find((entry) => entry.number === number);
+    if (!table) return;
+    setTableFormError("");
+    setTableEditor({ number, capacity: String(table.seats), guests: String(table.currentGuests ?? 0), status: table.status });
+  }
+
+  async function saveTable(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!tableEditor) return;
+    const capacity = Number(tableEditor.capacity);
+    const guests = Number(tableEditor.guests);
+    if (!Number.isInteger(capacity) || capacity < 1 || !Number.isInteger(guests) || guests < 0) {
+      setTableFormError(tr("Capacity and guests must be whole positive numbers.", "يجب أن تكون السعة وعدد الضيوف أرقاماً صحيحة.")); return;
+    }
+    if (guests > capacity) {
+      setTableFormError(tr(`This table can seat at most ${capacity} guests.`, `تتسع هذه الطاولة لحد أقصى ${capacity} ضيوف.`)); return;
+    }
+    const status = guests > 0 ? "occupied" : tableEditor.status;
+    if (hasBackendConfig()) {
+      try { await posApi(`/api/tables/table-${tableEditor.number}`, { method: "PUT", body: JSON.stringify({ capacity, currentGuests: guests, status }) }); }
+      catch (error) { setTableFormError(error instanceof Error ? error.message : tr("Could not update table.", "تعذر تحديث الطاولة.")); return; }
+    }
+    setTables((current) => current.map((table) => table.number === tableEditor.number ? { ...table, seats: capacity, currentGuests: guests, status } : table));
+    setTableEditor(null); showNotice(tr("Table updated", "تم تحديث الطاولة"));
+  }
+
+  function openReservation() {
+    setReservationForm({ ...emptyReservationForm, date: getTodayInputValue() });
+    setReservationFormError(""); setReservationEditorOpen(true);
+  }
+
+  async function saveReservation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const guests = Number(reservationForm.guests); const tableNumber = Number(reservationForm.tableNumber);
+    const table = tables.find((entry) => entry.number === tableNumber);
+    if (reservationForm.customerName.trim().length < 2) { setReservationFormError(tr("Enter the customer name.", "أدخل اسم الزبون.")); return; }
+    if (!table || !Number.isInteger(guests) || guests < 1) { setReservationFormError(tr("Choose a table and a valid guest count.", "اختر طاولة وعدد ضيوف صحيح.")); return; }
+    if (guests > table.seats) { setReservationFormError(tr(`Table ${table.number} can seat at most ${table.seats} guests.`, `تتسع الطاولة ${table.number} لحد أقصى ${table.seats} ضيوف.`)); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(reservationForm.date) || !/^\d{2}:\d{2}$/.test(reservationForm.time)) { setReservationFormError(tr("Choose a valid date and time.", "اختر تاريخاً ووقتاً صحيحين.")); return; }
+    const conflict = reservations.some((entry) => entry.tableNumber === tableNumber && entry.date === reservationForm.date && entry.time === reservationForm.time && (entry.status === "upcoming" || entry.status === "seated"));
+    if (conflict) { setReservationFormError(tr("This table already has an active reservation at that time.", "لدى هذه الطاولة حجز نشط في هذا الوقت.")); return; }
+    let reservationId = crypto.randomUUID();
+    if (hasBackendConfig()) {
+      try {
+        const result = await posApi<{ id: string }>("/api/reservations", { method: "POST", body: JSON.stringify({ customerName: reservationForm.customerName.trim(), guestCount: guests, tableId: `table-${tableNumber}`, startsAt: new Date(`${reservationForm.date}T${reservationForm.time}:00`).toISOString(), phone: reservationForm.phone.trim(), notes: reservationForm.notes.trim() }) });
+        reservationId = result.id;
+      } catch (error) { setReservationFormError(error instanceof Error ? error.message : tr("Could not create reservation.", "تعذر إنشاء الحجز.")); return; }
+    }
+    setReservations((current) => [...current, { id: reservationId, customerName: reservationForm.customerName.trim(), guests, tableNumber, date: reservationForm.date, time: reservationForm.time, phone: reservationForm.phone.trim(), notes: reservationForm.notes.trim(), status: "upcoming" }]);
+    setTables((current) => current.map((entry) => entry.number === tableNumber && entry.status === "available" ? { ...entry, status: "reserved" as const } : entry));
+    setReservationEditorOpen(false); showNotice(tr("Reservation created", "تم إنشاء الحجز"));
+  }
+
+  async function seatReservation(reservation: Reservation) {
+    const table = tables.find((entry) => entry.number === reservation.tableNumber);
+    if (!table || reservation.guests > table.seats) { showNotice(tr("Table capacity is no longer sufficient.", "سعة الطاولة لم تعد كافية.")); return; }
+    if (hasBackendConfig()) {
+      try { await posApi(`/api/reservations/${encodeURIComponent(reservation.id)}/seat`, { method: "POST", body: JSON.stringify({}) }); }
+      catch (error) { showNotice(error instanceof Error ? error.message : tr("Could not seat reservation.", "تعذر إجلاس الحجز.")); return; }
+    }
+    setReservations((current) => current.map((entry) => entry.id === reservation.id ? { ...entry, status: "seated" as const } : entry));
+    setTables((current) => current.map((entry) => entry.number === reservation.tableNumber ? { ...entry, status: "occupied" as const, currentGuests: reservation.guests } : entry));
+    showNotice(tr(`${reservation.customerName} seated at table ${reservation.tableNumber}`, `تم إجلاس ${reservation.customerName} على الطاولة ${reservation.tableNumber}`));
   }
 
   if (!currentUser) {
@@ -1893,8 +2094,8 @@ export default function Home() {
                 </span>
               </label>
               {loginError && <p className="auth-error" role="alert">{loginError}</p>}
-              <button className="auth-submit" type="submit" disabled={!accountsReady || !loginForm.username.trim() || !loginForm.password}>
-                {tr("Sign in to Cocktaillo", "تسجيل الدخول إلى كوكتايلو")} <span>→</span>
+              <button className="auth-submit" type="submit" disabled={backendBusy || !accountsReady || !loginForm.username.trim() || !loginForm.password}>
+                {backendBusy ? tr("Signing in…", "جارٍ تسجيل الدخول…") : tr("Sign in to Cocktaillo", "تسجيل الدخول إلى كوكتايلو")} <span>→</span>
               </button>
             </form>
             <div className="auth-security-note">
@@ -2026,7 +2227,7 @@ export default function Home() {
                           key={option}
                         >
                           <strong>{option === "manager" ? tr("Manager", "مدير") : tr("Cashier", "كاشير")}</strong>
-                          <small>{option === "manager" ? tr("Full POS access", "صلاحيات كاملة") : tr("Orders, kitchen, tables & shift", "الطلبات والمطبخ والطاولات والدوام")}</small>
+                          <small>{option === "manager" ? tr("Full POS access", "صلاحيات كاملة") : tr("Orders, tables, reservations & shift", "الطلبات والطاولات والحجوزات والدوام")}</small>
                         </button>
                       );
                     })}
@@ -2051,6 +2252,36 @@ export default function Home() {
           </section>
         </div>
       )}
+      {tableEditor && (
+        <div className="menu-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setTableEditor(null); }}>
+          <section className="menu-modal-dialog compact-dialog" role="dialog" aria-modal="true" aria-labelledby="table-editor-title">
+            <header className="menu-modal-header"><div><p>TABLE {tableEditor.number}</p><h2 id="table-editor-title">{tr("Table occupancy", "إشغال الطاولة")}</h2></div><button type="button" onClick={() => setTableEditor(null)} aria-label="Close">×</button></header>
+            <form onSubmit={saveTable}><div className="menu-modal-scroll"><div className="menu-form-grid">
+              <label className="menu-field">{tr("Maximum capacity", "السعة القصوى")}<input autoFocus inputMode="numeric" value={tableEditor.capacity} onChange={(event) => { setTableEditor((current) => current ? { ...current, capacity: event.target.value.replace(/\D/g, "") } : current); setTableFormError(""); }}/></label>
+              <label className="menu-field">{tr("Current guests", "عدد الضيوف الحالي")}<input inputMode="numeric" value={tableEditor.guests} onChange={(event) => { setTableEditor((current) => current ? { ...current, guests: event.target.value.replace(/\D/g, "") } : current); setTableFormError(""); }}/></label>
+              <label className="menu-field wide">{tr("Status", "الحالة")}<select value={tableEditor.status} onChange={(event) => setTableEditor((current) => current ? { ...current, status: event.target.value as TableStatus } : current)}><option value="available">Available</option><option value="occupied">Occupied</option><option value="reserved">Reserved</option></select></label>
+            </div>{tableFormError && <p className="menu-form-error" role="alert">{tableFormError}</p>}</div><footer className="menu-modal-actions"><button type="button" onClick={() => setTableEditor(null)}>{tr("Cancel", "إلغاء")}</button><button className="menu-save-action" type="submit">{tr("Save table", "حفظ الطاولة")}</button></footer></form>
+          </section>
+        </div>
+      )}
+
+      {reservationEditorOpen && (
+        <div className="menu-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setReservationEditorOpen(false); }}>
+          <section className="menu-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="reservation-editor-title">
+            <header className="menu-modal-header"><div><p>RESERVATION</p><h2 id="reservation-editor-title">{tr("New reservation", "حجز جديد")}</h2></div><button type="button" onClick={() => setReservationEditorOpen(false)} aria-label="Close">×</button></header>
+            <form onSubmit={saveReservation}><div className="menu-modal-scroll"><div className="menu-form-grid">
+              <label className="menu-field wide">{tr("Customer name", "اسم الزبون")}<input autoFocus value={reservationForm.customerName} onChange={(event) => setReservationForm((current) => ({ ...current, customerName: event.target.value }))}/></label>
+              <label className="menu-field">{tr("Guests", "الضيوف")}<input inputMode="numeric" value={reservationForm.guests} onChange={(event) => setReservationForm((current) => ({ ...current, guests: event.target.value.replace(/\D/g, "") }))}/></label>
+              <label className="menu-field">{tr("Assigned table", "الطاولة")}<select value={reservationForm.tableNumber} onChange={(event) => setReservationForm((current) => ({ ...current, tableNumber: event.target.value }))}><option value="">{tr("Choose table", "اختر طاولة")}</option>{tables.map((table) => <option key={table.number} value={table.number}>{tr("Table", "طاولة")} {table.number} · {table.seats} {tr("seats", "مقاعد")}</option>)}</select></label>
+              <label className="menu-field">{tr("Date", "التاريخ")}<input type="date" value={reservationForm.date} onChange={(event) => setReservationForm((current) => ({ ...current, date: event.target.value }))}/></label>
+              <label className="menu-field">{tr("Time", "الوقت")}<input type="time" value={reservationForm.time} onChange={(event) => setReservationForm((current) => ({ ...current, time: event.target.value }))}/></label>
+              <label className="menu-field">{tr("Phone (optional)", "الهاتف (اختياري)")}<input type="tel" value={reservationForm.phone} onChange={(event) => setReservationForm((current) => ({ ...current, phone: event.target.value }))}/></label>
+              <label className="menu-field wide">{tr("Notes (optional)", "ملاحظات (اختياري)")}<textarea value={reservationForm.notes} onChange={(event) => setReservationForm((current) => ({ ...current, notes: event.target.value }))}/></label>
+            </div>{reservationFormError && <p className="menu-form-error" role="alert">{reservationFormError}</p>}</div><footer className="menu-modal-actions"><button type="button" onClick={() => setReservationEditorOpen(false)}>{tr("Cancel", "إلغاء")}</button><button className="menu-save-action" type="submit">{tr("Create reservation", "إنشاء الحجز")}</button></footer></form>
+          </section>
+        </div>
+      )}
+
       {factoryResetOpen && (
         <div
           className="confirm-backdrop"
@@ -2062,14 +2293,15 @@ export default function Home() {
           <section className="confirm-dialog factory-reset-dialog" role="alertdialog" aria-modal="true" aria-labelledby="factory-reset-title" aria-describedby="factory-reset-description">
             <span className="confirm-icon">!</span>
             <h2 id="factory-reset-title">{tr("Factory reset this POS?", "إعادة ضبط المصنع لهذا الجهاز؟")}</h2>
-            <p id="factory-reset-description">{tr("This permanently clears operational data on this POS device and signs you out.", "سيؤدي هذا إلى حذف بيانات التشغيل نهائياً من هذا الجهاز وتسجيل خروجك.")}</p>
+            <p id="factory-reset-description">{tr("This permanently clears transactional data. Type RESET to confirm.", "سيؤدي هذا إلى حذف بيانات التشغيل نهائياً. اكتب RESET للتأكيد.")}</p>
             <div className="factory-reset-scope">
-              <div><span>×</span><p><strong>{tr("Will be reset", "سيتم حذفه")}</strong>{tr("Users, net sales, average order, recent orders, expenses, inventory, shifts, kitchen tickets, tables and preferences.", "المستخدمون وصافي المبيعات ومعدل الطلب والطلبات الأخيرة والمصاريف والمخزون والدوامات وشاشة المطبخ والطاولات والإعدادات.")}</p></div>
-              <div className="preserved"><span>✓</span><p><strong>{tr("Will be preserved", "سيبقى محفوظاً")}</strong>{tr("All menu items, their prices, photos and every topping.", "جميع أصناف القائمة وأسعارها وصورها وكل الإضافات.")}</p></div>
+              <div><span>×</span><p><strong>{tr("Will be reset", "سيتم حذفه")}</strong>{tr("Orders, sales, expenses, shifts, reservations, table sessions, cash history and inventory quantities.", "الطلبات والمبيعات والمصاريف والدوامات والحجوزات وجلسات الطاولات وحركة النقد وكميات المخزون.")}</p></div>
+              <div className="preserved"><span>✓</span><p><strong>{tr("Will be preserved", "سيبقى محفوظاً")}</strong>{tr("Menu, prices, images, recipes, inventory definitions, tables, users, roles and settings.", "القائمة والأسعار والصور والوصفات وتعريفات المخزون والطاولات والمستخدمون والصلاحيات والإعدادات.")}</p></div>
             </div>
+            <label className="reset-confirm-field">{tr("Type RESET", "اكتب RESET")}<input autoFocus value={factoryResetConfirmation} onChange={(event) => setFactoryResetConfirmation(event.target.value)} autoComplete="off"/></label>
             <div className="confirm-actions">
-              <button className="secondary-action" type="button" onClick={() => setFactoryResetOpen(false)}>{tr("Cancel", "إلغاء")}</button>
-              <button className="danger-action" type="button" onClick={performFactoryReset}>{tr("Reset everything else", "حذف كل شيء آخر")}</button>
+              <button className="secondary-action" type="button" onClick={() => { setFactoryResetOpen(false); setFactoryResetConfirmation(""); }}>{tr("Cancel", "إلغاء")}</button>
+              <button className="danger-action" type="button" disabled={factoryResetConfirmation !== "RESET"} onClick={performFactoryReset}>{tr("Reset transactional data", "حذف بيانات التشغيل")}</button>
             </div>
           </section>
         </div>
@@ -2223,6 +2455,12 @@ export default function Home() {
                     {tr("Expense date", "تاريخ المصروف")}
                     <input type="date" value={expenseForm.date} onChange={(event) => { setExpenseForm((current) => ({ ...current, date: event.target.value })); setExpenseFormError(""); }}/>
                   </label>
+                  <label className="menu-field wide">
+                    {tr("Paid from", "دُفع من")}
+                    <select value={expenseForm.paidFrom} onChange={(event) => { setExpenseForm((current) => ({ ...current, paidFrom: event.target.value as "cash_drawer" | "owner" })); setExpenseFormError(""); }}>
+                      <option value="cash_drawer">{tr("Cash Drawer", "صندوق النقد")}</option><option value="owner">{tr("Owner", "المالك")}</option>
+                    </select>
+                  </label>
                 </div>
                 <div className="expense-form-note">ⓘ {tr(`The amount is entered in ${currency} and reports store its USD value.`, `يُدخل المبلغ بعملة ${currency} وتحفظ التقارير قيمته بالدولار.`)}</div>
                 {expenseFormError && <p className="menu-form-error" role="alert">{expenseFormError}</p>}
@@ -2297,15 +2535,16 @@ export default function Home() {
                         <textarea value={menuItemForm.description} onChange={(event) => setMenuItemForm((current) => ({ ...current, description: event.target.value }))} placeholder={tr("Short description shown to the cashier", "وصف قصير يظهر للكاشير")} maxLength={140}/>
                       </label>
                       <label className="menu-field wide">
-                        {tr("Photo URL (optional)", "رابط الصورة (اختياري)")}
-                        <input dir="ltr" inputMode="url" value={menuItemForm.image} onChange={(event) => { setMenuItemForm((current) => ({ ...current, image: event.target.value })); setMenuFormError(""); }} placeholder="https://..."/>
+                        {tr("Menu photo (optional)", "صورة الصنف (اختياري)")}
+                        <input type="file" accept="image/jpeg,image/png,image/webp" disabled={menuImageUploading} onChange={(event) => void uploadMenuImage(event.target.files?.[0])}/>
                       </label>
                     </div>
                     <div className="menu-image-preview">
                       <span aria-hidden="true">{menuCategoryIcon(menuItemForm.category)}</span>
                       {menuItemForm.image && <img key={menuItemForm.image} src={menuItemForm.image} alt="" onLoad={(event) => { event.currentTarget.style.display = "block"; }} onError={(event) => { event.currentTarget.style.display = "none"; }}/>}
-                      <p><strong>{tr("Photo preview", "معاينة الصورة")}</strong><small>{tr("If left blank, a category icon is shown.", "إذا تركتها فارغة سيظهر رمز الفئة.")}</small></p>
+                      <p><strong>{menuImageUploading ? tr("Uploading…", "جارٍ الرفع…") : tr("Persistent photo preview", "معاينة الصورة المحفوظة")}</strong><small>{tr("JPG, PNG or WebP · maximum 5 MB", "JPG أو PNG أو WebP · بحد أقصى 5 ميغابايت")}</small></p>
                     </div>
+                    {menuItemForm.image && <button className="remove-menu-image" type="button" onClick={() => setMenuItemForm((current) => ({ ...current, image: "" }))}>{tr("Remove photo", "إزالة الصورة")}</button>}
                     <label className="menu-active-toggle">
                       <input type="checkbox" checked={menuItemForm.customizable} onChange={(event) => setMenuItemForm((current) => ({ ...current, customizable: event.target.checked }))}/>
                       <span><strong>{tr("Ask add-on questions", "اسأل عن الإضافات")}</strong><small>{tr("Cashier chooses available flavors and add-ons with Yes or No.", "يختار الكاشير النكهات والإضافات المتاحة بنعم أو لا.")}</small></span>
@@ -2582,20 +2821,13 @@ export default function Home() {
             </section>
           )}
 
-          {view === "kitchen" && (
-            <section className="kitchen-page">
-              <div className="welcome-row compact"><div><p className="page-kicker">KITCHEN DISPLAY</p><h2>Live orders</h2><p>Tap an order when preparation is complete.</p></div><div className="kitchen-counts"><span><b>{kitchenOrders.filter((order) => order.status === "pending").length}</b> Pending</span><span><b>{kitchenOrders.filter((order) => order.status === "done").length}</b> Done</span></div></div>
-              <div className="kitchen-columns">
-                <div><h3><i className="pending-dot"/>Pending</h3><div className="kitchen-grid">{kitchenOrders.filter((order) => order.status === "pending").map((order) => <article className="kitchen-ticket pending" key={order.id}><header><span><strong>{order.number}</strong><small>{order.type}</small></span><b>{order.time}</b></header>{order.customer && <p>{order.customer}</p>}<ul>{order.items.map((item) => <li key={item}>{item}</li>)}</ul><div className="kitchen-ticket-actions"><button className="print-ticket" onClick={() => printKitchenReceipt(order)}>▤ Print ticket</button><button onClick={() => toggleKitchenOrder(order.id)}>✓ Mark as done</button></div></article>)}</div></div>
-                <div><h3><i className="done-dot"/>Done</h3><div className="kitchen-grid">{kitchenOrders.filter((order) => order.status === "done").map((order) => <article className="kitchen-ticket done" key={order.id}><header><span><strong>{order.number}</strong><small>{order.type}</small></span><b>Done</b></header>{order.customer && <p>{order.customer}</p>}<ul>{order.items.map((item) => <li key={item}>{item}</li>)}</ul><div className="kitchen-ticket-actions"><button className="print-ticket" onClick={() => printKitchenReceipt(order)}>▤ Reprint ticket</button><button onClick={() => toggleKitchenOrder(order.id)}>↶ Return to pending</button></div></article>)}</div></div>
-              </div>
-            </section>
-          )}
-
           {view === "tables" && (
-            <section>
-              <div className="welcome-row compact"><div><p className="page-kicker">DINING ROOM</p><h2>Table management</h2><p>Tap a table to move between available, occupied and reserved.</p></div><div className="legend"><span><i className="available"/>Available</span><span><i className="occupied"/>Occupied</span><span><i className="reserved"/>Reserved</span></div></div>
-              <div className="table-grid">{tables.map((table) => <button className={`restaurant-table ${table.status}`} key={table.number} onClick={() => updateTable(table.number)}><span className="table-number">{table.number}</span><small>Table</small><strong>{table.status}</strong><div><span>♙ {table.seats}</span>{table.order && <span>{table.order}</span>}</div>{table.total && <b>${table.total.toFixed(2)}</b>}</button>)}</div>
+            <section className="tables-page">
+              <div className="welcome-row compact"><div><p className="page-kicker">DINING ROOM</p><h2>{tr("Tables & reservations", "الطاولات والحجوزات")}</h2><p>{tr("Manage live guest occupancy and upcoming reservations.", "إدارة إشغال الضيوف والحجوزات القادمة.")}</p></div><div className="table-page-actions"><div className="legend"><span><i className="available"/>Available</span><span><i className="occupied"/>Occupied</span><span><i className="reserved"/>Reserved</span></div><button className="primary-button" type="button" onClick={openReservation}>+ {tr("Reservation", "حجز")}</button></div></div>
+              <div className="table-grid">{tables.map((table) => <button className={`restaurant-table ${table.status}`} key={table.number} onClick={() => updateTable(table.number)}><span className="table-number">{table.number}</span><small>{tr("Table", "طاولة")}</small><strong>{table.status}</strong><div><span>♙ <b>{table.currentGuests ?? 0} / {table.seats}</b> {tr("Guests", "ضيوف")}</span>{table.order && <span>{table.order}</span>}</div>{table.total && <b>${table.total.toFixed(2)}</b>}</button>)}</div>
+              <section className="panel reservations-panel"><div className="panel-head"><div><h3>{tr("Reservations", "الحجوزات")}</h3><p>{tr("Upcoming and seated guests", "الضيوف القادمون والجالسون")}</p></div></div>
+                <div className="reservation-list">{reservations.map((reservation) => <article className="reservation-card" key={reservation.id}><div><strong>{reservation.customerName}</strong><small>{reservation.date} · {reservation.time}{reservation.phone ? ` · ${reservation.phone}` : ""}</small></div><span>{reservation.guests} / {tables.find((table) => table.number === reservation.tableNumber)?.seats ?? "—"} {tr("Guests", "ضيوف")}</span><span>{tr("Table", "طاولة")} {reservation.tableNumber}</span><b className={reservation.status}>{reservation.status}</b>{reservation.status === "upcoming" && <button type="button" onClick={() => seatReservation(reservation)}>{tr("Seat reservation", "إجلاس الحجز")}</button>}</article>)}{!reservations.length && <div className="reservation-empty">{tr("No reservations yet.", "لا توجد حجوزات بعد.")}</div>}</div>
+              </section>
             </section>
           )}
 
@@ -2711,10 +2943,10 @@ export default function Home() {
               <div className="welcome-row compact"><div><p className="page-kicker">{tr("COST TRACKING", "تتبع المصاريف")}</p><h2>{tr("Expenses", "المصاريف")}</h2><p>{tr("Add, edit and delete electricity, salaries, internet, rent, supplies and other costs.", "أضف وعدّل واحذف تكاليف الكهرباء والرواتب والإنترنت والإيجار واللوازم وغيرها.")}</p></div><button className="primary-button" onClick={openAddExpense}>+ {tr("Add expense", "إضافة مصروف")}</button></div>
               <div className="user-storage-note"><span>⌂</span><p><strong>{tr("Saved on this POS device", "محفوظ على جهاز نقطة البيع هذا")}</strong>{tr("Every change is included automatically in future Excel reports.", "كل تعديل يُضاف تلقائياً إلى تقارير Excel المستقبلية.")}</p></div>
               <div className="expense-categories">{["⚡ Electricity","♙ Salary","⌁ Internet","⌂ Rent","□ Supplies","••• Other"].map((category) => <span key={category}>{category}</span>)}</div>
-              <div className="metric-grid three"><Metric label={tr("Today", "اليوم")} value={money(todayExpenses.reduce((sum, expense) => sum + expense.amount, 0))} trend={`${todayExpenses.length} ${tr("entries", "قيود")}`} icon="↘"/><Metric label={tr("This month", "هذا الشهر")} value={money(monthExpenses.reduce((sum, expense) => sum + expense.amount, 0))} trend={`${monthExpenses.length} ${tr("recorded expenses", "مصاريف مسجلة")}`} icon="$"/><Metric label={tr("Top category", "أعلى فئة")} value={topExpenseCategory} trend={tr("Largest operating cost", "أكبر تكلفة تشغيلية")} icon="□"/></div>
+              <div className="metric-grid"><Metric label={tr("Total expenses", "إجمالي المصاريف")} value={money(expenses.reduce((sum, expense) => sum + expense.amount, 0))} trend={`${expenses.length} ${tr("entries", "قيود")}`} icon="↘"/><Metric label={tr("Cash Drawer", "صندوق النقد")} value={money(cashDrawerExpenses.reduce((sum, expense) => sum + expense.amount, 0))} trend={tr("Deducted from shifts", "مخصوم من الدوامات")} icon="$"/><Metric label={tr("Owner Paid", "دفع المالك")} value={money(ownerExpenses.reduce((sum, expense) => sum + expense.amount, 0))} trend={tr("Does not affect drawer", "لا يؤثر على الصندوق")} icon="♙"/><Metric label={tr("This month", "هذا الشهر")} value={money(monthExpenses.reduce((sum, expense) => sum + expense.amount, 0))} trend={topExpenseCategory} icon="□"/></div>
               <section className="panel data-panel"><PanelHead title={tr("Recent expenses", "المصاريف الأخيرة")} caption={tr("All recorded operating costs", "جميع تكاليف التشغيل المسجلة")} action={tr("Export Excel", "تصدير Excel")} onAction={exportExcel}/>
-                <div className="expense-table table-head"><span>{tr("Description", "الوصف")}</span><span>{tr("Category", "الفئة")}</span><span>{tr("Date", "التاريخ")}</span><span>{tr("Added by", "أضيف بواسطة")}</span><span>{tr("Amount", "المبلغ")}</span><span>{tr("Actions", "إجراءات")}</span></div>
-                {expenses.map((expense) => <div className="expense-table" key={expense.id}><span><strong>{expense.item}</strong></span><span>{expense.category}</span><span>{formatExpenseDate(expense.date)}</span><span>{expense.addedBy}</span><span><strong>{money(expense.amount)}</strong></span><span className="expense-row-actions"><button type="button" onClick={() => openEditExpense(expense)}>✎ {tr("Edit", "تعديل")}</button><button type="button" className="delete" onClick={() => setExpenseDeleteConfirmation(expense)}>× {tr("Delete", "حذف")}</button></span></div>)}
+                <div className="expense-table table-head"><span>{tr("Description", "الوصف")}</span><span>{tr("Category", "الفئة")}</span><span>{tr("Date", "التاريخ")}</span><span>{tr("Paid from", "دُفع من")}</span><span>{tr("Amount", "المبلغ")}</span><span>{tr("Actions", "إجراءات")}</span></div>
+                {expenses.map((expense) => <div className="expense-table" key={expense.id}><span><strong>{expense.item}</strong></span><span>{expense.category}</span><span>{formatExpenseDate(expense.date)}</span><span>{(expense.paidFrom ?? "owner") === "cash_drawer" ? tr("Cash Drawer", "صندوق النقد") : tr("Owner", "المالك")}</span><span><strong>{money(expense.amount)}</strong></span><span className="expense-row-actions"><button type="button" onClick={() => openEditExpense(expense)}>✎ {tr("Edit", "تعديل")}</button><button type="button" className="delete" onClick={() => setExpenseDeleteConfirmation(expense)}>× {tr("Delete", "حذف")}</button></span></div>)}
                 {!expenses.length && <div className="expense-empty"><span>↘</span><strong>{tr("No expenses recorded", "لا توجد مصاريف مسجلة")}</strong><small>{tr("Use Add expense to create the first record.", "استخدم إضافة مصروف لإنشاء أول سجل.")}</small></div>}
               </section>
             </section>
@@ -2770,7 +3002,7 @@ export default function Home() {
           {view === "reports" && role === "manager" && (
             <section>
               <div className="welcome-row compact"><div><p className="page-kicker">PERFORMANCE</p><h2>Reports</h2><p>Sales, expenses, inventory and profit in a professional Excel workbook.</p></div><div className="report-actions"><div className="period-switch">{["Daily","Monthly","Yearly"].map(item => <button className={period === item ? "active" : ""} onClick={() => setPeriod(item)} key={item}>{item}</button>)}</div><button className="excel-button" onClick={exportExcel}>⇩ Export {period} Excel</button></div></div>
-              <div className="metric-grid"><Metric label="Gross sales" value={period === "Daily" ? money(salesTotal) : period === "Monthly" ? money(34680) : money(392440)} trend={period === "Daily" ? tr("Live POS total", "مجموع مباشر") : "+12.4%"} icon="$"/><Metric label="Net profit" value={period === "Daily" ? money(salesTotal - todayExpenses.reduce((sum, expense) => sum + expense.amount, 0)) : period === "Monthly" ? money(20148) : money(227615)} trend={period === "Daily" ? tr("Sales minus expenses", "المبيعات ناقص المصاريف") : "57.8% margin"} icon="↗"/><Metric label="Orders" value={period === "Daily" ? String(orders) : period === "Monthly" ? "1,146" : "13,204"} trend={period === "Daily" ? tr("Recorded today", "مسجلة اليوم") : "+8.1%"} icon="#"/><Metric label="Expenses" value={period === "Daily" ? money(todayExpenses.reduce((sum, expense) => sum + expense.amount, 0)) : period === "Monthly" ? money(2418) : money(31806)} trend={period === "Daily" ? `${todayExpenses.length} ${tr("entries", "قيود")}` : "-6.2%"} icon="↘"/></div>
+              <div className="metric-grid"><Metric label="Gross sales" value={money(salesTotal)} trend={tr("Persisted finalized sales", "المبيعات النهائية المحفوظة")} icon="$"/><Metric label="Net profit" value={money(salesTotal - expenses.reduce((sum, expense) => sum + expense.amount, 0))} trend={tr("Sales minus expenses", "المبيعات ناقص المصاريف")} icon="↗"/><Metric label="Orders" value={String(orders)} trend={tr("Finalized orders", "الطلبات النهائية")} icon="#"/><Metric label="Expenses" value={money(expenses.reduce((sum, expense) => sum + expense.amount, 0))} trend={`${cashDrawerExpenses.length} ${tr("drawer", "صندوق")} · ${ownerExpenses.length} ${tr("owner", "مالك")}`} icon="↘"/></div>
               <div className="dashboard-grid reports"><section className="panel"><PanelHead title={`${period} sales`} caption="Revenue performance" action="Export"/><div className="report-chart">{[42,58,46,72,64,86,78,95,74,88,82,98].map((h,i)=><i key={i} style={{height:`${h}%`}}/>)}</div></section><section className="panel"><PanelHead title="Best sellers" caption="By order quantity" action="All items"/>{menuItems.filter((item) => item.available).slice(0, 4).map((item,i)=><div className="seller-row" key={item.id}><b>{i+1}</b>{item.image ? <img src={item.image} alt="" onError={(event) => { event.currentTarget.style.display = "none"; }}/> : <span className="seller-placeholder">{menuCategoryIcon(item.category)}</span>}<span><strong>{item.name}</strong><small>{Math.max(18-i*3, 1)} orders</small></span><em>{money(item.price * Math.max(18-i*3, 1))}</em></div>)}</section></div>
             </section>
           )}

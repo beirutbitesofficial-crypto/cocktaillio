@@ -1,0 +1,2 @@
+UPDATE users SET password_hash='pbkdf2:100000:d8ade21dc3fa8c642621b27d62865b33:3e3f6c9ef8772c87a46fa9ce424874e353d5b16750ba4d45a056fa8006c02322',updated_at=CURRENT_TIMESTAMP WHERE id='manager-1';
+UPDATE users SET password_hash='pbkdf2:100000:c9d3628c5c9d02053f04fb925c8f4cae:175dae8953dfd7b73811cd153986990d4c158f2ff6a653f74fe8edb166af0b69',updated_at=CURRENT_TIMESTAMP WHERE id IN ('cashier-1','cashier-2','cashier-3');

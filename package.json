@@ -9,7 +9,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs tests/printing-contract.test.mjs",
+    "test": "npm run build && node --test tests/rendered-html.test.mjs tests/printing-contract.test.mjs tests/pos-domain.test.mjs",
+    "test:unit": "node --experimental-strip-types --test tests/pos-domain.test.mjs tests/printing-contract.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
   },
