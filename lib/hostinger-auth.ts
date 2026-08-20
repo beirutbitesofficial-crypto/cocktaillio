@@ -1,12 +1,13 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-export type HostingerUser = { id: string; username: string; name: string; role: "manager" | "cashier" };
+export type HostingerUser = { id: string; username: string; name: string; role: "manager" | "cashier" | "waiter" };
 
 const users: Array<HostingerUser & { password: string }> = [
   { id: "manager-1", username: "manager", password: "2300", name: "Alex Daher", role: "manager" },
   { id: "cashier-1", username: "cashier", password: "1234", name: "Jamie D.", role: "cashier" },
   { id: "cashier-2", username: "maya", password: "1234", name: "Maya Khalil", role: "cashier" },
   { id: "cashier-3", username: "sam", password: "1234", name: "Sam Rami", role: "cashier" },
+  { id: "waiter-1", username: "waiter", password: "12345678", name: "Waiter", role: "waiter" },
 ];
 
 function secret() {
